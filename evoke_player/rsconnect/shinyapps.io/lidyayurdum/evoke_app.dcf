@@ -1,0 +1,12 @@
+name: evoke_app
+title: evoke_app
+username: lidyayurdum
+account: lidyayurdum
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16768682
+bundleId: 12557699
+url: https://lidyayurdum.shinyapps.io/evoke_app/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE

@@ -1,0 +1,321 @@
+---
+bibliography: themusiclab_filtered.bib
+csl: nature.csl
+always_allow_html: true
+header-includes:
+- \usepackage[left]{lineno}
+- \usepackage{ragged2e}
+- \usepackage{caption}
+- \usepackage{longtable}
+- \usepackage[labelformat = empty]{caption}
+- \usepackage{afterpage}
+- \usepackage{fontenc}
+- "\\usepackage[soul]{lua-ul}"
+- \usepackage{luacolor}
+- \usepackage[symbol]{footmisc}
+- \usepackage{mdframed}
+- \usepackage{float}
+- "```{=latex}\n\\captionsetup[figure]{labelformat=empty}\n\\definecolor{bleu}{HTML}{2200cc}\n\\newenvironment{shadebox}{\\begin{figure*}\\begin{mdframed}[backgroundcolor=black!10]}
+  \n  {\\end{mdframed}\\end{figure*}} % this defines `shadebox` for shaded boxes that
+  work with pandoc citations\n\\newenvironment{whitebox}{\\begin{figure*}\\begin{mdframed}[backgroundcolor=white]}
+  \n  {\\end{mdframed}\\end{figure*}} % this defines `whitebox` for white boxes that
+  work with pandoc citations\n\\setlength\\linenumbersep{5mm}\n```\n"
+- \definecolor{bleu}{HTML}{2200cc}
+- \renewcommand{\thefootnote}{\fnsymbol{footnote}}
+notes-after-punctuation: false
+urlcolor: bleu
+linkcolor: bleu
+output:
+  pdf_document:
+    latex_engine: lualatex
+    number_sections: true
+    fig_caption: true
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r chunk_knit_settings, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+options(scipen = 999) # disable scientific notation
+```
+
+
+```{r load_libraries_and_functions}
+library(pacman) # install.packages(pacman)
+
+pacman::p_load(
+  tidyverse,
+  here,
+  emmeans,
+  broom.mixed,
+  kableExtra, # for pretty tables
+  patchwork, # for plots in panels
+  magick # for png image plotting
+)
+
+load(here("results", "0_ns.RData")) # from 0_data_processing.R
+load(here("results", "01_maps.RData")) # from 01_map_builder.R
+load(here("results", "02_demo_tables.RData")) # from 02_demographic_tables.R
+load(here("results", "03_imputation_results.RData")) # from 03_imputation.R
+load(here("results", "05_billboard_variance_results.RData")) # from 05_variance_modelling_billboard.R
+load(here("results", "06_billboard_cor_results.RData")) # from 06_correlations_billboard.R
+load(here("results", "07_nhs_variance_results.RData")) # from 07_variance_modelling_nhs.R
+load(here("results", "08_nhs_cor_results.RData")) # from 08_correlation_nhs.R
+load(here("results", "plots.RData")) # from 08_correlation_nhs.R
+load(here("results", "10_language_replication_results.RData")) # from 10_language_replication.R
+
+
+# percent format (takes raw ratio, rounds to percentage points)
+p0 <- function(x) format(round(x * 100, 0), nsmall = 0)
+p1 <- function(x) format(round(x * 100, 1), nsmall = 1)
+p2 <- function(x) format(round(x * 100, 2), nsmall = 2)
+
+# rounds to decimal points
+r0 <- function(x) format(round(x, 0), nsmall = 0)
+r2 <- function(x) format(round(x, 2), nsmall = 2)
+r3 <- function(x) format(round(x, 3), nsmall = 3)
+
+# format numbers as strings with comma as thousand separator
+pn <- function(x) prettyNum(x, big.mark = ",")
+
+# format p-values
+fp <- function(num) {
+  if (num < .0001) {
+    return("< .0001")
+  } else if (num < .001) {
+    return("< .001")
+  } else if (num < .01) {
+    return(paste0("= ", round(num, digits = 3)))
+  } else {
+    return(paste0("= ", round(num, digits = 2)))
+  }
+}
+
+fsig <- function(num) {
+  if (num < .001) {
+    return("***")
+  } else if (num < .01) {
+    return("**")
+  } else if (num < .05) {
+    return(paste0("* = ", round(num, digits = 3)))
+  } else {
+    return(paste0("= ", round(num, digits = 2)))
+  }
+}
+
+palette <- c(
+  "#5F4690FF",
+  "#1D6996FF",
+  "#38A6A5FF",
+  "#0F8554FF",
+  "#73AF48FF",
+  "#EDAD08FF",
+  "#E17C05FF",
+  "#CC503EFF",
+  "#94346EFF",
+  "#855686FF",
+  "#C07ABDFF",
+  "#445156FF"
+)
+```
+
+
+\raggedright
+\LARGE 
+\textbf{Cultural invariance in music-evoked emotions}
+
+\vspace{0.2in}
+
+\justifying
+\normalsize
+Lidya Yurdum$^{1,2,\ast}$, Jan Simson$^{2,3,4,5}$, Roza G. Kamiloğlu$^{6,7}$, Disa A. Sauter$^{1,8,\dagger}$, and Samuel A. Mehr$^{2,9,\dagger}$
+
+\small
+$^{1}$Department of Psychology, University of Amsterdam, The Netherlands \
+$^{2}$Child Study Center, Yale University, USA \
+$^{3}$University of Mannheim, Germany\
+$^{4}$Ludwig-Maximilians-Universität München, Germany\
+$^{5}$Munich Center for Machine Learning (MCML), Germany\
+$^{6}$Department of Experimental and Applied Psychology, Vrije Universiteit Amsterdam, Amsterdam, The Netherlands\
+$^{7}$Institute Brain and Behaviour Amsterdam (iBBA), Vrije Universiteit Amsterdam, Amsterdam, The Netherlands\
+$^{8}$Department of Experimental Psychology, University of Oxford, United Kingdom\
+$^{9}$School of Psychology, University of Auckland, New Zealand\
+
+\*Corresponding author. E-mail: [l.yurdum@uva.nl](mailto:l.yurdum@uva.nl){.email} (L.Y.)
+
+\dagger These authors contributed equally; order was determined by coin flip.
+
+\vspace{0.2in}
+
+::: {.shadebox data-latex=""}
+\small
+Worldwide, people produce and listen to music to induce, express, and regulate their own and others’ emotions [@Gabrielsson2011; @Kokkidou2009; @Lonsdale2011; @Schafer2013;@Juslin2008a; @Gabrielsson2003;@Liljestrom2013]. To what extent culture influences the emotions evoked by music is, however, contested. The documented global variation in musical behaviours [@Nattiez1999; @Jairazbhoy1995;@Norris2014] and emotion concepts [@Mesquita1992; @Mesquita2016; @Lim2016] suggests substantial cross-cultural differences in how listeners relate to music emotionally [@Nettl1983; @Nattiez1977; @Jacoby2020], while shared physiology and evolutionary history would predict broad global agreement on the emotional information extracted from music [@Mehr2021; @Juslin2008a; @Mehr2025; @Hagen2003; @Hagen2022; @Fink2021]. Some evidence suggests shared processes [@Fritz2009; @Argstatter2016; @Balkwill2004; @Laukka2013; @Celen2025; @Athanasopoulos2021; @Cowen2020] but experiments on the subject do not represent global diversity in either music or participants [@Warrenburg2020; @Henrich2010; @Yarkoni2022; @Hilton2022b].  Here, we report a large citizen-science experiment wherein listeners (*N* = `r n_full %>% pn` in `r countries_nhs$name %>% length` countries; conducted in English) rated their emotional responses to popular Western music and to vocal music produced in mostly small-scale societies drawn from a globally representative corpus (i.e., songs assumed to be unfamiliar in style). We found strong similarity in listeners’ emotional responses to music: Average agreement between pairs of countries’ listeners was high. Furthermore, across both popular and unfamiliar types of music, emotional responses were shaped far more by individual listeners and the specific songs than by cultural background: Both between-person differences within a country and within-subject differences across songs explained substantially more variance in emotional responses than country-wise differences. Together, these results indicate that a listener’s cultural background has only a marginal influence on the emotions they feel in response to music, raising the possibility of universal structure in emotional responses to music. 
+:::
+
+\normalsize
+
+# Main text {-}
+
+\linenumbers
+
+Music likely exists in all cultures [@Mehr2019] and has played a central role in self-expression, ritual, and daily life [@Lonsdale2011; @Sloboda2001b; @Juslin2004] throughout our history [@Conard2009; @Mehr2021]. A key feature of music is that it is distinctly emotional: Listeners experience intense emotional reactions when engaging with music [@Gabrielsson2011] and often listen to music to alleviate negative feelings, enhance positive feelings, or set a specific mood [@Kokkidou2009; @Lonsdale2011; @Schafer2013]. Moreover, listeners readily perceive emotions in music [@Juslin2004; @Gabrielsson2003] and can identify the intended emotions behind compositions [@Balkwill2004].
+
+The centrality of emotions to music may help explain the ubiquity of musical behaviours. Emotional responses are a key motivation for why people seek out music: Listeners tend to prefer songs that induce stronger emotions [@Liljestrom2013] and the top reasons participants report listening to music in their daily lives are also linked to influencing and regulating emotions [@Juslin2004].
+
+Emotional responses to music are likely the result of a complex set of mechanisms [@Juslin2013], some of which are grounded in our shared human physiology and evolutionary past [@Juslin2003a]. Our auditory and autonomic nervous systems make certain acoustic features in music (and other vocal channels [@Scherer2015]) more likely to induce certain emotions in listeners, regardless of cultural exposure. For instance, sudden loudness or a fast-paced, steady beat are likely to lead to arousal or excitement [@Juslin2014; @Juslin2013], while a slower tempo and fewer changes in pitch are associated with tenderness [@Juslin2003a] and relaxation [@Canessa-Pollard2025]. These latter features are observed in lullabies across cultures [@Unyk1992; @Mehr2019] and their emotional associations develop early in life: Western infants show physiological signs of relaxation when hearing lullabies from unfamiliar cultures, despite having no prior exposure to the musical traditions the lullabies originated from [@Bainbridge2020].
+
+The acoustic characteristics of music are predictive of the emotions induced by music [@Daly2015; @Juslin2022]. As a result, listeners’ reports of the emotions induced by music may be expected to show similarity across cultures. This prediction is supported by evidence from multiple cultures [@Juslin2016; @Balkwill1999; @Fritz2009; @Argstatter2016]. For instance, Western (European and North American) and East Asian listeners (from China) agree on the emotions induced by music from each other's cultures [@Cowen2020; @Putkinen2024]. 
+
+Shared mechanisms do not preclude substantial cultural differences in the emotions listeners experience when listening to music. Music is evidently culturally situated and influenced by experience [@Nettl2015; @Jacoby2020; @Singh2023]: People tend to prefer familiar music [@Madison2017], are more sensitive to culturally-familiar musical features [@Jacoby2017; @Balkwill1999], and preferences for some musical characteristics differ cross-culturally [@McDermott2016]. More fundamentally, many aspects of musical behaviour are highly culturally-specific, with structures and expressive functions that vary across societies [@Nettl1983; @Nattiez1977]. 
+
+For instance, the meaning and emotions derived from Australian Aboriginal navigational songs (*songlines*) which provide a system for navigation and invoke spiritual stories [@Norris2014], are difficult to comprehend for listeners unfamiliar with this cultural context. Similarly, Western listeners may not be familiar with the melodic patterns in Hindustani ragas that are culturally associated with particular times of day and emotional states [@Jairazbhoy1995]. The emotions induced by music are thus influenced by culturally-learned extra-musical and contextual information, such as familiarity with genre conventions [@Susino2020] or knowledge of the original setting of a piece [@Vuoskoski2015].
+
+Quantifying the extent of commonalities in the emotions induced by music across cultures and across individuals can, however, be a challenge. In practice, studies tend to focus on comparing two or three cultures at a time, with small sets of musical examples [@Warrenburg2020]. A lack of diversity in both the listener and music samples [@Henrich2010; @Yarkoni2022] may skew estimates of cross-cultural agreement, in either a positive or negative direction. In smaller studies, cross-cultural agreement may reflect convergence within a narrow slice of global music and populations rather than genuine cross-cultural agreement. Alternatively, cases of cross-cultural disagreement may emerge as an exception that proves the rule: an unusual case of disagreement as a result of the specific stimuli and populations that are tested.
+
+Citizen science and gamification present a set of tools that can help address these concerns. In citizen-science research, participants are motivated to voluntarily participate out of curiosity, interest, enjoyment, or the desire to contribute to science, enabling the collection of data from large numbers of volunteers [@Long2023]. Larger sample sizes enable the testing of large numbers of stimuli, which increases the generalisability of findings [@Hilton2022b]. We adopt this approach here, to ask whether cross-cultural agreement in emotional responses to music emerges when both listeners and musical stimuli are sampled to ensure high cultural diversity.
+
+We recruited `r n_full %>% pn` participants living in `r countries_nhs$name %>% length` countries (Figure 1a), who reported speaking a total of `r languages_nhs$name %>% length - 1` languages other than English. They participated in the study on [themusiclab.org](https://themusiclab.org), a popular citizen-science platform. Participants listened to brief excerpts of popular Western music, with styles that were likely broadly familiar to listeners (hereafter, popular music), and excerpts from the *Natural History of Song Discography* [@Mehr2019], featuring songs collected from mostly small-scale societies and sung in non-English languages  (hereafter, unfamiliar music; Figure 1b). After each excerpt, participants indicated how the music made them feel by choosing from a fixed set of emotion terms used in prior research [@Zentner2008]. 
+
+We asked how similar listeners' emotional responses to music were to one another, and what explained links between musical content and emotional responses. We first performed exploratory analyses using the popular music dataset. Based on the results of these analyses, we pre-registered the analyses we report for the unfamiliar music sample at https://osf.io/mw435 (see SI Text 1 for details). Readers can explore the data visually and listen to the music featured in the study at https://lidyayurdum.shinyapps.io/evoke_app/.
+
+
+```{r out.width="80%", fig.align='center',fig.cap="{\\small \\textbf{Figure 1. Relative invariance in emotional responses to music across countries.} (\\textbf{a}) Geographic distribution of participants. (\\textbf{b}) Locations of recordings studied, from the \\textit{Natural History of Song Discography}, which comprised the unfamiliar musical stimuli. (\\textbf{c}) Mean emotion ratings per song were significantly correlated between pairs of countries. To measure cross-country agreement, we first computed each country's mean rating on each emotion dimension for each song. For each pair of countries, we then correlated these song-wise means. This generated a correlation coefficient for each pair of countries, on each emotion dimension, plus arousal and valence (as demonstrated in the inset example). The histograms denote the distributions of Pearson's $r$ values for all pairwise country combinations, for popular (left side) and unfamiliar music (right side). Valence and arousal denote the two latent emotion dimensions produced by dimension reduction. Countries with fewer than 400 participants are excluded. (\\textbf{d-e}) The percentage of explained variance attributable to the country the listener lives in, the song they heard, and the listener's own unique response pattern for (\\textbf{d}) popular music and (\\textbf{e}) unfamiliar music, from mixed-effects regressions predicting participants' emotional ratings with random intercepts for country, listener, and song. Valence and arousal denote the two latent emotion dimensions produced by dimension reduction (see Figure S5a-b for an equivalent visualisation of the GEMS-9 factors). The white overlay text indicates the ratios of variance explained by song to country or individual to country, respectively.}"}
+# edited version of fig 1
+knitr::include_graphics(here("viz","fig1.pdf"))
+```
+
+
+# Results {-}
+
+## Emotional responses to music are highly consistent across cultures {-}
+
+To facilitate cross-cultural analysis of emotional responses across many listeners, songs, and emotion terms, we imputed missing data and reduced the dimensionality of the emotion ratings, which yielded two primary dimensions of variation corresponding to valence and arousal (see Methods, SI Text 2, and Figures S1-2). The reduction of discrete emotion ratings to these two factors is consistent with prior studies that organise emotional responses to music along these dimensions [@Mavrolampadosa2026; @Eerola2011; @Vuoskoski2011; @Korsmit2023]. Moreover, the two dimensions correlated as expected with ratings of pleasantness and excitement for the same songs from prior work [@Mehr2018a], supporting our interpretation of the dimensions as valence and arousal, respectively (Figure S3). 
+
+First, we assessed agreement among groups of listeners by computing mean scores for the valence and arousal factors for each song among listeners from each country. We then computed all pairwise correlations among the `r countries_billboard %>% filter(n>400) %>% pull(name) %>% length` countries with sufficient data available for the analysis ($n >$ 400; median $n =$ `r countries_billboard %>% filter(n>400) %>% pull(n) %>% median`, range = `r countries_billboard %>% filter(n>400) %>% pull(n) %>% min` - `r countries_billboard %>% filter(n>400) %>% pull(n) %>% max %>% pn`). The pairwise correlations in popular music were high for both valence (median *r* = `r billboard_cor_results %>% filter(variable == "Valence") %>% pull(correlation) %>% median() %>% r2`, IQR = `r billboard_cor_results %>% filter(variable == "Valence") %>% pull(correlation) %>% IQR() %>% r2`) and arousal (median *r* = `r billboard_cor_results %>% filter(variable == "Arousal") %>% pull(correlation) %>% median() %>% r2`, IQR = `r billboard_cor_results %>% filter(variable == "Arousal") %>% pull(correlation) %>% IQR() %>% r2`).
+
+This pattern repeated across other analyses of interest. The correlations remained high when using unimputed data (Figure 1c), aggregated to produce the nine factors reported in previous work [@Zentner2008], rather than our dimensionality reduction (SI Text 3.1). The median correlation across all country pairings and all nine emotion dimensions was $r =$ `r gems_mean_cors_400 %>% pull(mean_correlation) %>% median() %>% r2` (range: 
+$r =$ `r gems_mean_cors_400  %>% pull(mean_correlation) %>% min() %>%  r2` - `r gems_mean_cors_400 %>% pull(mean_correlation) %>% max() %>% r2`, IQR = `r gems_mean_cors_400 %>% pull(mean_correlation) %>% IQR() %>% r2` ; full reporting in Table S1). This latter analysis approach likely represents a lower bound on the pairwise correlations; following previous work [@Cowen2020], we also computed noise-corrected correlation coefficients, which were higher (see Figure S4 and SI Text 4.1). We found comparable patterns of results when computing pairwise correlations across language groups (Table S2).
+
+Notably, cross-cultural similarity in emotion ratings was higher when listeners evaluated unfamiliar vocal music, across imputed (median $r_{valence} =$ `r nhs_cor_results %>% filter(variable == "Valence") %>% pull(correlation) %>% median() %>% r2`, median $r_{arousal} =$ `r nhs_cor_results %>% filter(variable == "Arousal") %>% pull(correlation) %>% median() %>% r2`), unimputed (median $r =$ `r nhs_gems_mean_cors_400 %>% pull(mean_correlation) %>% median() %>% r2`, range: $r =$ `r nhs_gems_mean_cors_400  %>%  pull(mean_correlation) %>% min() %>% r2` - `r nhs_gems_mean_cors_400  %>% pull(mean_correlation) %>% max() %>%  r2`, IQR = `r nhs_gems_mean_cors_400  %>% pull(mean_correlation) %>% IQR() %>%  r2`) and noise-corrected correlations (median $r =$ `r nhs_gems_mean_cors_400_adjusted %>% pull(mean_adjusted_correlation) %>% median() %>% r2`, range: $r =$ `r nhs_gems_mean_cors_400_adjusted  %>%  pull(mean_adjusted_correlation) %>% min() %>% r2` - `r nhs_gems_mean_cors_400_adjusted  %>% pull(mean_adjusted_correlation) %>% max() %>%  r2`, IQR = `r nhs_gems_mean_cors_400_adjusted  %>% pull(mean_adjusted_correlation) %>% IQR() %>%  r2`; full reporting in Table S1). This result suggests that evaluating responses to familiar Western music, rather than more diverse musical samples, can in fact underestimate cross-cultural similarities in listeners. Unlike what might be expected from a standpoint of strong cultural relativity, agreement was more substantial when listeners heard music from cultures they had minimal exposure to, rather than songs that featured familiar popular music characteristics. 
+
+A possible reason for the higher agreement among listeners when hearing unfamiliar music could be the nature of the unfamiliar songs featured in this study. The unfamiliar music corpus comprised songs used in four specific behavioural contexts where singing occurs globally: soothing infants, dancing, healing the sick, and expressing love for another person [@Mehr2019]. The strong agreement on the emotions induced by these songs may reflect species-wide constraints on the forms of songs used in specific behavioural contexts [@Mehr2018a]. Functional constraints on the acoustic form of human songs have been primarily argued in the contexts of soothing infants and coordinating collective movement [@Hilton2022; @Mehr2021; @Savage2015]; and indeed, the emotional ratings provided by listeners in the present study also most clearly differentiated lullabies and dance songs (SI Text 5.1 and Figure S6). 
+
+## Emotional responses to music vary more within cultures than between them {-}
+
+The above results suggest substantial agreement across cultures in the emotions induced by music, and especially for unfamiliar traditional music. What explains the variance that does exist in responses? We addressed this question using a variance decomposition approach. We fit mixed-effects regressions for each dimension, predicting participants' emotion ratings with random intercepts for country, listener, and song, so as to estimate the variance explained by each factor. We found that the magnitudes of variability attributable to both individual differences (i.e., how people's emotional responses vary in relation to one another within a country) and of variability attributable to differences in songs (i.e., how music itself varies emotionally) far exceeded variability attributable to the listener's country of origin (Figure 1d).
+
+The proportions of variance explained by each factor are reported in Table S3. For the recordings of popular music, the ratio of within-country to between-country variability in emotion ratings was `r ((billboard_mod1_tidy %>% filter(group=="user_id") %>% pull(prop_var)) / (billboard_mod1_tidy %>% filter(group=="country") %>% pull(prop_var))) %>%  r0`:1 for valence and `r ((billboard_mod2_tidy %>% filter(group=="user_id") %>% pull(prop_var)) / (billboard_mod2_tidy %>% filter(group=="country") %>% pull(prop_var))) %>%  r0`:1 for arousal. The ratio of between-song to between-country variability in emotion ratings was `r ((billboard_mod1_tidy %>% filter(group=="song") %>% pull(prop_var)) / (billboard_mod1_tidy %>% filter(group=="country") %>% pull(prop_var))) %>%  r0`:1 for valence and `r ((billboard_mod2_tidy %>% filter(group=="song") %>% pull(prop_var)) / (billboard_mod2_tidy %>% filter(group=="country") %>% pull(prop_var))) %>%  r0`:1 for arousal.
+
+When analysing emotional responses to unfamiliar music (Figure 1e), within-country variability again exceeded between-country variability (`r ((nhs_mod1_tidy %>% filter(group=="user_id") %>% pull(prop_var)) / (nhs_mod1_tidy %>% filter(group=="country") %>% pull(prop_var))) %>%  r0`:1 for valence and `r ((nhs_mod2_tidy %>% filter(group=="user_id") %>% pull(prop_var)) / (nhs_mod2_tidy %>% filter(group=="country") %>% pull(prop_var))) %>%  r0`:1 for arousal; Table S4). This implies that cross-cultural similarity in emotion perception in music likely generalises to *all music*, rather than being limited to music from familiar, popular-music styles. If anything, country-level information about listeners explained less variability in listeners' emotional responses when the music was from unfamiliar styles.
+
+These results were not attributable to the specifications of the pre-registered model: The same pattern of results was found when analysing unimputed emotion ratings, aggregated to produce nine factors [@Zentner2008] (Figure S5a-b). They also were relatively uninfluenced by listeners from countries with smaller samples; the main findings repeated when limiting analyses to countries with at least 800 participants (instead of 400; SI Text 3.2). In contrast, when applying the same model to a similarly structured dataset where cross-country variability is known to be substantial (i.e., weather stations distributed across the globe), a control analysis applied in previous research [@Mehr2019], the results differed substantially, ruling out the findings being an analytic artefact (Figure S5c and SI Text 3.3). 
+
+Last, to ensure that grouping listeners by country did not overestimate group-level similarities, given the interconnectedness of modern culture [@Alsaleh2024; @Magu2015], we estimated variance ratios for the nine factors from previous work [@Zentner2008] using another proxy for cultural similarity: the listeners' native language. The main results replicated; the median ratio of within-language to between-language variance for popular music across the factors was `r billboard_gems_variance_data_lang_ind$within_to_between %>% median %>% r0`:1, and `r nhs_gems_variance_data_lang_ind$within_to_between %>% median %>% r0`:1 for unfamiliar music (full reporting in SI Text 3.4). These findings suggest that listeners' cultural background has relatively little influence on their emotional responses to music. 
+
+One limitation of these data is that the participants in this study all completed the study in English — a common limitation in cognitive science research [@Blasi2022]. If the participants in our study were artificially homogeneous or particularly unique in how they respond to the cues present in music, this could limit the generalisability of findings. We think this is unlikely, as we did find a significant effect of both country and language on the emotions reported by listeners, indicating cultural heterogeneity in our sample. We also conducted a secondary analysis to test the degree to which the results of the English-language experiment reported here were in line with findings from other experiments that were not conducted in English. Using an external dataset [@Yurdum2023], we found that our sample’s emotion ratings predicted perceptual judgements about the contexts in which the same songs were used, made by native speakers of non-English languages, and also by people living in three relatively isolated, smaller-scale societies (see SI Text 5.2 and Figure S7). This correspondence suggests that our sample's responses were not solely attributable to perceptual judgements or biases unique to globalised, internet-connected English-speakers.
+
+
+\clearpage
+
+# Discussion {-}
+
+In a large, diverse sample of listeners and a wide range of musical examples, we found that the emotions listeners reported in response to music were predictable from the song listeners heard, individual variability, and country of origin — but the magnitude of influence of these variables differed considerably from one another. Country was consistently the weakest predictor of emotional responses and within-country differences were substantially larger than between-country differences across two stimulus sets and all measures of emotion. This result is surprising from a strong cultural-relativist perspective, where the associations between musical features and emotions would be learned primarily through enculturation and shaped by local conventions.
+
+The extent of agreement in our data instead speaks to species-wide psychological and auditory mechanisms, around which individual tendencies vary, resulting in larger within-country variation than between. This is consistent with documented variability in musical behaviours and features, which is concentrated within societies rather than between them [@Mehr2019; @Daikoku2020]; but also with variability in other aspects of human biology — genetic variation within groups is often much larger than variation between groups [@Witherspoon2007]. Similar results are also observable in non-musical behavioural and psychological domains, such as parenting behaviours and attitudes [@Deater-Deckard2018], personality and values [@Stankov2011], the impressions people form of others [@Hester2021], and emotion regulation strategies [@Klein2024].
+
+Given relatively large differences in sample size, we did not attempt to model differences in the degree of cross-cultural agreement in responses to the two types of music studied here (i.e., Western popular music and unfamiliar traditional music). We note, however, that the raw levels of listener agreement in response to culturally unfamiliar music are substantially higher than those of Western popular music. This is not necessarily inconsistent with prior work: Cross-cultural differences in prior work are primarily observed when listeners from one culture are familiar with the musical tradition [@Li2025; @Fritz2009; @Athanasopoulos2021]. We speculate that cultural differences in emotional responses may be minimised when all listeners are equally unfamiliar with the music, as in the present study. We also note that the traditional music studied represents songs from behavioural contexts that reliably occur globally (e.g., lullabies [@Trehub1998a]); it is possible that these songs are functional in their given behavioural contexts precisely *because* they reliably evoke certain reactions. These results also highlight a consideration for what musical characteristics are taken into account when studying the relationship between music and emotions: While responses are often contrasted across cultures or musical traditions, the function a song serves is currently an under-studied predictor of listener agreement. This may be particularly relevant when a song is functional in social contexts that occur reliably globally, as in the present study.
+
+We found that the specific song listeners heard predicted listeners' emotional reactions more strongly than the country they were from. Acoustic features such as tempo, loudness and timbre can all shape the emotions listeners experience when listening to music [@Juslin2008; @Gomez2007], via mechanisms that may range from low-level reflexes, to higher-level processes such as recognising the emotion present in a singer's voice. The relatively stronger contribution of acoustic information compared to culture-specific knowledge is also evident in listeners’ non-emotional judgements of music. For example, our prior work found that acoustic information (i.e., the particular song listeners heard) predicted how appropriate listeners judged it for the functions of soothing infants, dancing, expressing love, or healing illness. Familiarity with the song's origin provided a statistically significant advantage in judgement accuracy, but this boost associated with cultural learning was negligible compared to the information present in the song itself [@Yurdum2023].
+
+Across both popular Western music and unfamiliar global music, we found that the high-dimensional emotion space reduced to two dimensions, broadly interpretable as arousal and valence. <!-- [SM: unless this has been published in the meantime, should leave out - bit weird to feature a preprint that hasn't been peer-reviewed imo] These results echo those of Mavrolampadosa and colleagues [-@Mavrolampadosa2026], who also note that studying a larger breadth of cultures leads to retaining fewer dimensions that are shared across more groups. -->Arousal ratings were primarily influenced by the song listeners heard while valence ratings were more variable across individuals. This pattern is consistent with prior work, and likely reflects the features these dimensions track: arousal is more clearly linked to musical characteristics such as tempo and amplitude, whereas valence tends to have less consistent acoustic predictors [e.g., @Egermann2015; @Schubert2004]. Moreover, most of the musical examples we studied included singing — arousal, more so than valence, tracks a range of acoustic parameters in non-musical vocal prosody [@Goudbeek2010; @Banse1996; @Patel2010c; @Banziger2015]. 
+
+We do not, however, believe the present results imply that cultural learning is unimportant in shaping emotional responses to music. In other contexts, relatively small effects have helped to explain complex psychological phenomena [@Gotz2022], including effects of comparable size to those associated with country that we report here. Furthermore, our study may not have created optimal conditions for detecting cultural differences: we measured relatively immediate responses to brief musical excerpts, without allowing participants to personally select or engage deeply with the music. Intentional listening and active engagement may provide greater opportunities for cultural differences to emerge [@Juslin2008]. 
+
+And while the songs studied were highly diverse, no single study can fully represent the world’s musical variation. The unfamiliar music corpus, for example, features four song types that are thought to occur universally (i.e., dance, lullaby, healing, love), but not other common song types (e.g., children's play songs, mourning songs [@Bertolo2025]). It also does not contain rarer examples of culturally-specific uses of music, such as Mongolian long songs (*urtiin duu*), where single syllables can be drawn out such that a song lasts up to three hours [@Whitener2017]; or Tuvan throat singing, where singers seek to harmonise with or mimic non-human natural sounds [@Levin1999].
+
+We note several other limitations. First, country is an imperfect proxy for cultural differences; and the countries with larger sample sizes were also disproportionately likely to be Western (although the main findings were also found when studying native languages rather than countries of origin). Second, the study and all measurements were in English, implying that participants were sufficiently literate in English to complete the experiment. While this limitation is difficult to avoid in large-scale cross-cultural work, its impact may be mitigated by first reducing the dimensionality of responses to arousal and valence: high-valence and high-arousal emotion terms tend to cluster similarly across languages [@Celen2025] and emotional responses to music have been characterised across 13 cultures in terms of arousal and valence [@Mavrolampadosa2026]. Further, the unfamiliar music studied was drawn from a pseudorepresentative global sample of music from non-English-speaking, mostly small-scale societies. We also report correspondence between the current (English-limited) data and prior datasets collected in many non-English languages, including three smaller-scale societies. Nonetheless, the English-language sampling of participants may have reduced the extent of cultural differences detected [@Blasi2022]; future studies in other languages can directly evaluate the scope of this limitation.
+
+\bigskip
+
+# Methods {-}
+
+## Ethics approvals {-}
+
+All participants provided informed consent under protocols approved by the Harvard University Committee on the Use of Human Subjects (protocol IRB2017-1206) or the Yale University Human Research Protection Program (protocol 2000033433). No compensation was provided.
+
+## Participants {-}
+
+Participants were players of the *What's Your Musical Style?* game on https://themusiclab.org, a citizen science platform.  The data reported in this manuscript were collected between April 2019 and August 2026. Recruitment was largely by word-of-mouth, supplemented by social media and mailing list postings.
+
+We studied `r n_full %>% pn` participants whose reported age was between 16 and 100; who completed at least one trial of the music listening task; who did not provide the same emotion intensity rating on every trial of the task; and who did not have missing, duplicated, or internally inconsistent country data (which occurs in online data collection due to connectivity failures or other technical issues). These participants provided a total of `r n_rows  %>% pn` individual emotion ratings, translating to an average of `r song_counts_billboard %>% r0 %>% pn` emotion ratings per song in the popular music corpus and `r song_counts_nhs %>% r0 %>% pn` per song in the unfamiliar music corpus.
+
+Of these participants, `r n_billboard %>% pn` (`r p1(df_gender_billboard[df_gender_billboard[["."]] == "Female",]$Freq/n_billboard)`% women, `r p1(df_gender_billboard[df_gender_billboard[["."]] == "Male",]$Freq /n_billboard)`% men, `r p1(df_gender_billboard[df_gender_billboard[["."]] == "Other",]$Freq /n_billboard)`% other, `r p2(missing_gender_billboard/n_billboard)`% gender information missing or inconsistent) provided emotion ratings for 276 songs from the popular music corpus (mean age = `r age_mean_billboard %>% round(.,2)`, *SD* = `r age_sd_billboard %>% round(.,2)`, median = `r age_median_billboard`). These listeners reported `r countries_billboard$name %>% length` different native countries; the majority were from the United States (*n* = `r countries_billboard %>% filter(name == "USA") %>% pull(n) %>% pn`; see Table S5 for demographics), Canada (*n* = `r countries_billboard %>% filter(name == "Canada") %>% pull(n) %>% pn`) or the United Kingdom (*n* = `r countries_billboard %>% filter(name == "UK") %>% pull(n) %>% pn`); `r countries_billboard %>% filter(n>400) %>% pull(name) %>% length` of the `r countries_billboard$name %>% length` countries reported by listeners provided at least 400 participants (Table S6). A total of `r languages_billboard$name %>% length` different native languages were reported, with `r languages_billboard %>% filter(n>400) %>% pull(name) %>% length` languages represented by at least 400 participants. English was the most commonly reported first language (*n* = `r languages_billboard %>% filter(name == "English") %>% pull(n) %>% pn`). Spanish (*n* = `r languages_billboard %>% filter(name == "Spanish") %>% pull(n) %>% pn`) and German (*n* = `r languages_billboard %>% filter(name == "German") %>% pull(n) %>% pn`) were the next most widely spoken languages (Table S7). Part way through data collection, an item regarding bilingualism was introduced; of participants who provided this data, `r (bilinguals %>% filter(corpus == "billboard") %>% pull(lang_other) %>% table %>% prop.table)[2] %>% round(2)*100`% reported speaking a second language (*n* = `r (bilinguals %>% filter(corpus == "billboard") %>% pull(lang_other) %>% table)[2] %>% pn`).
+
+The 118 songs from the unfamiliar music corpus were rated by `r n_nhs %>% pn` participants (`r p1(df_gender_nhs[df_gender_nhs[["."]] == "Female",]$Freq/n_nhs)`% women, `r p1(df_gender_nhs[df_gender_nhs[["."]] == "Male",]$Freq /n_nhs)`% men, `r p1(df_gender_nhs[df_gender_nhs[["."]] == "Other",]$Freq /n_nhs)`% other, `r p2(missing_gender_nhs/n_nhs)`% missing or inconsistent; mean age = `r age_mean_nhs %>% round(.,2)`, *SD* = `r age_sd_nhs %>% round(.,2)`, median age = `r age_median_nhs`). Listeners from `r countries_nhs$name %>% length` different countries provided data; the largest groups were from the United States (*n* = `r countries_nhs %>% filter(name == "USA") %>% pull(n) %>% pn`), Canada (*n* = `r countries_nhs %>% filter(name == "Canada") %>% pull(n) %>% pn`) or the United Kingdom (*n* = `r countries_nhs %>% filter(name == "UK") %>% pull(n) %>% pn`). In total, `r countries_nhs %>% filter(n>400) %>% pull(name) %>% length` of the `r countries_nhs$name %>% length` countries reported by listeners provided at least 400 participants (Table S8). A total of `r languages_nhs$name %>% length` different native languages were reported, with `r languages_nhs %>% filter(n>400) %>% pull(name) %>% length` languages represented by more than 400 participants. English was the most commonly reported first language (*n* = `r languages_nhs %>% filter(name == "English") %>% pull(n) %>% pn`), followed by Spanish (*n* = `r languages_nhs %>% filter(name == "Spanish") %>% pull(n) %>% pn`) and German (*n* = `r languages_nhs %>% filter(name == "German") %>% pull(n) %>% pn`; Table S9). Of participants who provided data regarding bilingualism, `r (bilinguals %>% filter(corpus == "nhs") %>% pull(lang_other) %>% table %>% prop.table)[2] %>% round(2)*100`% reported speaking a second language (*n* = `r (bilinguals %>% filter(corpus == "nhs") %>% pull(lang_other) %>% table)[2] %>% pn`).
+
+The global distribution of participants is visualised in Figure 1a.
+
+## Materials {-}
+
+The game used stimuli from two musical corpora: a corpus of popular music and a corpus of unfamiliar music. The former consisted of 276 (15-second) excerpts taken from songs that featured on the Billboard Hot 100 charts from 1951 to 2019. For each year, we selected the songs in positions 1, 2, 19, and 20 on the year-end charts. The samples from the years 1951-2013 were originally studied in prior work [@Belfi2016]. We supplemented this set with songs from the 2014-2019 charts, to keep the musical samples relatively up-to-date. The samples contained either the chorus of the song or another recognisable portion (full list of songs in Table S10). 
+
+The unfamiliar music corpus comprised 118 songs from the *Natural History of Song Discography* [@Mehr2019], recorded in 86 mostly small-scale societies (Figure 1b). These songs are archival recordings of vocal music, originally performed in the contexts of dancing, soothing infants, healing illness, and expressing love for another person (SI Text 5.1). Audio files and associated metadata are available at https://zenodo.org/records/7265514.
+
+## Procedure {-}
+
+The experiment was conducted in English. After providing informed consent, participants were asked a set of demographic questions. These included gender, age, country of residence, language, musical experience and general level of education. Participants who had already provided this information in a prior visit to the website were not necessarily asked to re-report their responses. 
+
+Participants then listened to the song excerpts, drawn at random. The game initially presented participants with 8 songs, randomly sampled from the unfamiliar music corpus only; a further 8 songs randomly sampled from the popular music corpus were added to the experiment at a later date, resulting in 16 trials in total. After listening to each song excerpt, participants first rated how much they liked the song (n.b., we did not include or analyse those data for the work reported here), then proceeded to the primary emotion rating task.
+
+Participants were presented with three emotion labels randomly selected from the 25-item version of the Geneva Emotional Music Scale (GEMS) [@Zentner2008], one label at a time. Each item corresponds to an emotion term (e.g., *Joyful*, *Tearful*, *Dreamy*). These items load on to the nine factors of the abbreviated version of the scale, the GEMS-9 [@Zentner2008; @Jacobsen2024]. We made two changes to the emotion labels: (1) the item *Feeling of Transcendence* was changed to *Transcendent* in order to use consistent wording throughout the study; and (2) the rating system was changed from five to four options, to be consistent with other studies running on https://themusiclab.org. 
+
+Participants rated how much the song made them feel each of the emotions from 1 (Not at all) to 4 (Very much). These labels correspond to the ones used in the GEMS [@Zentner2008] with the exception of a midpoint label (as there was no midpoint on the 4-point scale). Participants were explicitly prompted to rate how the songs made them *feel*, rather than the emotion they thought the song expressed ("That song made me feel [emotion]."). At the end of the procedure, the game presented participants with a song that they might enjoy based on their responses, so as to increase participant engagement and encourage word-of-mouth recruitment. 
+
+The study was built in `jsPsych` [@deLeeuw2015], a software ecosystem for creating psychological experiments in JavaScript, and hosted first via Pushkin [@Hartshorne2019], and later via World-Wide-Lab (https://worldwidelab.org/).
+
+## Data imputation and dimension reduction {-}
+
+We began by reducing the 25 GEMS items into a smaller set of underlying dimensions, for two reasons. First, because the scale was originally developed and validated mainly in Western samples, we preferred to allow a unique cluster solution to emerge from our data, rather than assert the nine factors found in prior work [@Zentner2008]. Secondly, because each listener rated only a subset of songs and provided responses on a subset of the 25 possible emotion dimensions, our data are sparse with data missing at random; reducing dimensionality helps mitigate missingness by extracting stable underlying dimensions from the available responses. We describe the dimension reduction procedure using `softImpute` [@Hastie2013] in SI Text 2.1.
+
+Two data-driven components emerged. The loadings appeared to track valence and arousal; we confirmed this statistically in two ways. 
+
+Firstly, we used the NRC VAD (Valence Arousal and Dominance) lexicon [@Mohammad2025], which contains human ratings of perceived valence, arousal, and dominance for more than 55,000 English words. We retrieved these ratings for each of the GEMS-25 emotion terms (e.g., the term "serene", which is one of the GEMS-25 terms, scores high on valence, but low on arousal), and correlated these values with the loadings of each GEMS-25 dimension on the latent components. The loadings of the two components retained in the popular music sample significantly correlated with valence (*r* = `r v1_valence_billboard_400$estimate %>% r2`, *p* `r v1_valence_billboard_400$p.value %>% fp`) and arousal (*r* = `r v2_arousal_billboard_400$estimate %>% r2`, *p* `r v2_arousal_billboard_400$p.value %>% fp`), respectively. That is, the emotion terms that loaded most strongly on the first component were also higher in valence, and the emotion terms that loaded most strongly on the second component were higher in arousal (Figure S1b-c). The second component also correlated with dominance, though to a lesser extent (r = `r v2_dominance_billboard_400$estimate %>% r2`, *p* `r v2_dominance_billboard_400$p.value %>% fp`). Similarly, two dimensions correlating with valence (*r* = `r v1_valence_nhs_400$estimate %>% r2`, *p* `r v1_valence_nhs_400$p.value %>% fp`) and arousal (*r* = `r v2_arousal_nhs_400$estimate %>% r2`, *p* `r v2_arousal_nhs_400$p.value %>% fp`; Figures S2b-c) emerged in the unfamiliar music sample (with no significant correlations with dominance). 
+
+Secondly, we used data from a prior experiment using the same songs from the unfamiliar music corpus, where participants rated pleasantness, happiness, and excitement [@Mehr2018a]. All three terms are characterised by positive valence, and pleasantness in particular is a proxy for valence: Song-wise mean ratings of the three terms correlated with the song-wise mean scores on the first component (pleasantness: *r* = `r plea_by_valence$estimate %>% r2`, *p* `r plea_by_valence$p.value %>% fp`; happiness: *r* = `r happ_by_valence$estimate %>% r2`, *p* `r happ_by_valence$p.value %>% fp`; excitement: *r* = `r exci_by_valence$estimate %>% r2`, *p* `r exci_by_valence$p.value %>% fp`). The second component, by contrast, did not correlate with pleasantness (pleasantness: *r* = `r plea_by_arousal$estimate %>% r2`, *p* `r plea_by_arousal$p.value %>% fp`), but it did correlate with excitement, which is a positively valenced high arousal state (excitement: *r* = `r exci_by_arousal$estimate %>% r2`, *p* `r exci_by_arousal$p.value %>% fp`; Figure S3) and to a lesser extent, happiness (happiness: *r* = `r happ_by_arousal$estimate %>% r2`, *p* `r happ_by_arousal$p.value %>% fp`). 
+
+The results of the dimensionality reduction were robust to sample size specifications and also emerged when studying only countries with at least 800 participants (Figure S8). 
+
+Given these convergent results, throughout this paper we describe the first component as *valence* and the second as *arousal*. We encourage readers to validate these dimensions by listening to the songs used in the experiment while viewing their dimensional characterisation in the Shiny app available at https://lidyayurdum.shinyapps.io/evoke_app/. 
+
+# End notes {-}
+
+## Data, code, and materials availability {-}
+
+A fully reproducible manuscript; data, analysis code, and visualizations; other materials; and code for the experiment are available at https://github.com/themusiclab/music-emotions. Audio files and metadata from the *Natural History of Song Discography* are available at https://doi.org/10.5281/zenodo.7265514. Readers may participate in the experiment by visiting https://themusiclab.org/quizzes/jan and view dynamic visualizations at https://lidyayurdum.shinyapps.io/evoke_app/.
+
+## Acknowledgments {-}
+
+We thank the participants who contributed to the study via themusiclab.org. We are also grateful to the University of Amsterdam Stats Store, and especially Dr. Raoul Grasman, for guidance on dimension reduction using `SoftImpute`; Dr. Amy Belfi for collecting and sharing the stimuli that comprised the popular music corpus; and members of the Music Lab, especially Jingzuan Liu, Constance Bainbridge, Joyce Seok, Anna Bergson, Brooke Milosh, Liam Crowley, and Mila Bertolo, for reviewing stimuli metadata and providing feedback on the study design and manuscript. 
+
+## Author contributions {-}
+
+L.Y. wrote the manuscript, with contributions from D.S. and S.A.M.. L.Y. conducted analyses and created visualisations, including the accompanying Shiny App. D.S. and S.A.M. reviewed and edited the manuscript, supervised the project, and acquired funding. R.G.K. conducted code review. J.S. and S.A.M. conceived of the study. J.S. programmed the experiment for https://themusiclab.org. All authors edited and approved the resulting manuscript.
+
+## Competing Interests {-}
+
+The authors declare no competing interests.
+
+
+## Funding {-}
+
+This research was supported by the Harvard Data Science Initiative (S.A.M.), the National Institutes of Health Director’s Early Independence Award DP5OD024566 (S.A.M.), the Royal Society of New Zealand Te Apārangi Rutherford Discovery Fellowship RDF-UOA2103 (S.A.M.), and the Dutch Research Council Vici grant VI.C.221.052 (D.S.). 
+
+## Artificial intelligence disclosure {-}
+
+We disclose the following uses of artificial intelligence: Author L.Y. used the University of Amsterdam AI Chat (model `gpt-6.1-sol`) to help polish selected sentences for clarity, suggest additional literature to read, and generate and debug R code, primarily for visualisations and Shiny App design. In all uses, authors verified output manually. 
+
+
+\clearpage
+
+# References {-}

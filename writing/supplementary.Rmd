@@ -1,0 +1,843 @@
+---
+bibliography: themusiclab_filtered.bib
+csl: nature.csl
+always_allow_html: true
+header-includes:
+- \usepackage[left]{lineno}
+- \usepackage{ragged2e}
+- \usepackage{caption}
+- \usepackage{longtable}
+- \usepackage[labelformat = empty]{caption}
+- \usepackage{afterpage}
+- \usepackage{fontenc}
+- "\\usepackage[soul]{lua-ul}"
+- \usepackage{luacolor}
+- \usepackage[symbol]{footmisc}
+- \usepackage{mdframed}
+- \usepackage{float}
+- "```{=latex}\n\\captionsetup[figure]{labelformat=empty}\n\\definecolor{bleu}{HTML}{2200cc}\n\\newenvironment{shadebox}{\\begin{figure*}\\begin{mdframed}[backgroundcolor=black!10]}
+  \n  {\\end{mdframed}\\end{figure*}} % this defines `shadebox` for shaded boxes that
+  work with pandoc citations\n\\newenvironment{whitebox}{\\begin{figure*}\\begin{mdframed}[backgroundcolor=white]}
+  \n  {\\end{mdframed}\\end{figure*}} % this defines `whitebox` for white boxes that
+  work with pandoc citations\n\\setlength\\linenumbersep{5mm}\n```\n"
+- \definecolor{bleu}{HTML}{2200cc}
+- \renewcommand{\thefootnote}{\fnsymbol{footnote}}
+notes-after-punctuation: false
+urlcolor: bleu
+linkcolor: bleu
+output:
+  pdf_document:
+    latex_engine: lualatex
+    number_sections: true
+    fig_caption: true
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r chunk_knit_settings, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+options(scipen = 999) # disable scientific notation
+```
+
+
+```{r load_libraries_and_functions}
+library(pacman) # install.packages(pacman)
+
+pacman::p_load(
+  tidyverse,
+  here,
+  emmeans,
+  broom.mixed,
+  kableExtra, # for pretty tables
+  patchwork, # for plots in panels
+  magick # for png image plotting
+)
+
+load(here("results", "0_ns.RData")) # from 0_data_processing.R
+load(here("results", "01_maps.RData")) # from 01_map_builder.R
+load(here("results", "02_demo_tables.RData")) # from 02_demographic_tables.R
+load(here("results", "03_imputation_results.RData")) # from 03_imputation.R
+load(here("results", "05_billboard_variance_results.RData")) # from 05_variance_modelling_billboard.R
+load(here("results", "06_billboard_cor_results.RData")) # from 06_correlations_billboard.R
+load(here("results", "07_nhs_variance_results.RData")) # from 07_variance_modelling_nhs.R
+load(here("results", "08_nhs_cor_results.RData")) # from 08_correlation_nhs.R
+load(here("results", "plots.RData")) # from 08_correlation_nhs.R
+load(here("results", "10_language_replication_results.RData")) # from 10_language_replication.R
+
+
+# percent format (takes raw ratio, rounds to percentage points)
+p0 <- function(x) format(round(x * 100, 0), nsmall = 0)
+p1 <- function(x) format(round(x * 100, 1), nsmall = 1)
+p2 <- function(x) format(round(x * 100, 2), nsmall = 2)
+
+# rounds to decimal points
+r0 <- function(x) format(round(x, 0), nsmall = 0)
+r2 <- function(x) format(round(x, 2), nsmall = 2)
+r3 <- function(x) format(round(x, 3), nsmall = 3)
+
+# format numbers as strings with comma as thousand separator
+pn <- function(x) prettyNum(x, big.mark = ",")
+
+# format p-values
+fp <- function(num) {
+  if (num < .0001) {
+    return("< .0001")
+  } else if (num < .001) {
+    return("< .001")
+  } else if (num < .01) {
+    return(paste0("= ", round(num, digits = 3)))
+  } else {
+    return(paste0("= ", round(num, digits = 2)))
+  }
+}
+
+fsig <- function(num) {
+  if (num < .001) {
+    return("***")
+  } else if (num < .01) {
+    return("**")
+  } else if (num < .05) {
+    return(paste0("* = ", round(num, digits = 3)))
+  } else {
+    return(paste0("= ", round(num, digits = 2)))
+  }
+}
+
+
+palette <- c(
+  "#5F4690FF",
+  "#1D6996FF",
+  "#38A6A5FF",
+  "#0F8554FF",
+  "#73AF48FF",
+  "#EDAD08FF",
+  "#E17C05FF",
+  "#CC503EFF",
+  "#94346EFF",
+  "#855686FF",
+  "#C07ABDFF",
+  "#445156FF"
+)
+```
+
+\LARGE
+\textbf{Supplementary Information}
+
+\bigskip
+
+\Large
+\textbf{Supplementary Text}
+\normalsize
+
+\linenumbers
+
+# Information regarding pre-registration and exploratory analyses
+
+We first performed exploratory analyses using the popular music dataset. Based on the results of these analyses, we pre-registered the analyses we report for the unfamiliar music sample at https://osf.io/mw435. 
+
+We note one deviation from the pre-registration: The pre-registration states that we would select the latent emotion dimensions to retain after dimension reduction by using the elbow method on the singular values produced by *softImpute* [@Hastie2013]. The elbow method is a subjective visual heuristic. Instead, we opted for the more statistically rigorous approach reported in the manuscript, using Monte Carlo holdout cross-validation to determine the optimal parameters [@Choi2017]. We implemented this approach using scripts from the R-miss-tastic ecosystem [@Mayer2024], purpose-built for parameter selection in *softImpute.*
+
+# Dimension reduction using SoftImpute
+
+The data are sparse-by-design, with each of the 25 GEMS dimensions containing on average `r (100-(billboard_missingness*100) %>% round(.,2))`% (popular music corpus) and `r (100-(nhs_missingness*100) %>% round(.,2))`% (unfamiliar music corpus) complete responses. To address the sparse data structure via dimension reduction we used *softImpute* [@Hastie2013], a matrix completion method that assumes that listeners' ratings can be explained by a smaller set of latent factors, and provides a low-rank solution while estimating missing values [@Mazumder2010]. As such, *softImpute* combines the steps of imputation and dimension reduction. *SoftImpute* was built to address the problem of sparse matrices, such as in the Netflix challenge: A recommendation algorithm must be able to use viewers' ratings for less than 2% of all content featured on the platform to predict ratings for the remaining unseen movies [@Mazumder2010]. 
+
+Our analyses focused on countries with at least 400 participants to balance sufficient data per country with maintaining a broad range of countries for further analysis (n = `r countries_billboard %>% filter(n>400) %>% pull(name) %>% length` countries for listeners who heard popular music samples, and n = `r countries_nhs%>% filter(n>400) %>% pull(name) %>% length` countries for listeners who heard unfamiliar music). Because *softImpute* does not natively handle nested data, we first separated systematic sources of variation (due to repeated measurements per country, song, and listener), from variance shared across the emotion ratings. To do so, we first fit linear mixed-effects models with random intercepts per country, listener, and song, for each of the 25 emotion dimensions. From each mixed-effects model, we extracted two sets of data: the predicted value on each of the 25 emotion dimensions based only on country, listener, and song information; and the residuals (where available), representing the remaining unexplained variation. This allowed us to model the systematic variance due to the grouping structure of the data, and then approximate the latent emotion structure in the residuals. 
+
+We then approximated the residual matrix as low-rank products of latent factors. To do so, we first selected the optimal regularisation parameter ($\lambda$) via Monte Carlo holdout cross-validation using scripts from the R-miss-tastic ecosystem [@Mayer2024]. Across 10 random splits, 10% of the observed entries were masked and *softImpute* was fitted with 20 candidate log-spaced $\lambda$ values; we chose the $\lambda$ value that minimised reconstruction error. We then imputed the residuals using this value, and re-constructed the full dataset by adding the imputed residuals back to the values predicted by the mixed-effects models. Finally, the completed dataset was projected onto the latent factors. This procedure reduced the 25 (incomplete) emotion rating dimensions to two (completed) latent factors.
+
+We did not a-priori specify the number of latent components to retain. Using the optimal $\lambda$ value, two latent components survived singular-value shrinkage, in both the popular music data and in the unfamiliar music data (see Figures S1a and S2a for loadings). These components can be interpreted similarly to principal components. We mean-centered and scaled data before subsequent analyses. 
+
+# Replication analyses for primary models
+
+## Modeling with GEMS-9 factor solution
+
+We also conducted the variance analysis with the raw, non-imputed data, with responses aggregated to produce the nine GEMS-9 factors [@Zentner2008] (see Methods), rather than reduced to a two-factor solution. Per Zentner and colleagues, the 25 emotion dimensions featured in the GEMS-25 can be reduced to the 9-factor solution by calculating the average of the 2-3 emotion labels that map onto each dimension. Following this, we computed GEMS-9 dimension scores for each listener on each song by averaging their available ratings on the relevant GEMS-25 dimensions. We then mean-centered and rescaled the resulting scores within each dimension to aid model fit. 
+
+To estimate the variance explained by country, listeners and song, we fit separate mixed models for each GEMS dimension. We then regressed ratings per dimension onto random intercepts for country, listener, and song. The variances attributable to country, listener, and song were significantly larger than zero (Random-effects ANOVAs; all *p*s < .001) for all nine dimensions, for both popular music and unfamiliar music.
+
+These unimputed data are considerably noisier due to missingness and the inclusion of all `r countries_billboard$name %>% length` countries, including those with small sample sizes, in the models. Despite this noise, the pattern of results is consistent with the imputed data, with individual differences explaining the most variance in responses, followed by the song listeners heard, and finally the country the listener was from. For popular music, the individual listener explained between `r billboard_gems_variance_data$within_to_between[which(min(billboard_gems_variance_data$within_to_between)==billboard_gems_variance_data$within_to_between)] %>% unique %>% r0` and `r billboard_gems_variance_data$within_to_between[which(max(billboard_gems_variance_data$within_to_between)==billboard_gems_variance_data$within_to_between)] %>% unique %>% r0` times as much variance in responses as the country the listener was from (Figure S5a and Table S11). For unfamiliar music, the individual listener explained between `r nhs_gems_variance_data$within_to_between[which(min(nhs_gems_variance_data$within_to_between)==nhs_gems_variance_data$within_to_between)] %>% unique %>% r0` and `r nhs_gems_variance_data$within_to_between[which(max(nhs_gems_variance_data$within_to_between)==nhs_gems_variance_data$within_to_between)] %>% unique %>% r0` times as much variance in responses as the country the listener was from (Figure S5b and Table S12).
+
+
+
+```{r eval=FALSE, include=FALSE}
+# ranova results indicate that for all GEMS factors, country, listener and song capture significant variance
+for (gems in gems9_labels) {
+  index <- paste0(gems, "_ranova")
+  print(gems)
+  print(billboard_gems_variance_mods[[index]])
+}
+```
+
+## Restriction to large country-wise samples
+
+The variance analyses reported in the manuscript use imputed and reduced data from countries that provided at least 400 listeners. To ensure that our results were not influenced by the choice of sample size for these models, we replicated the main imputation pipeline and analyses using data from countries with at least 800 listeners. This stricter limit resulted in n = `r countries_billboard %>% filter(n>800) %>% pull(name) %>% length` countries for listeners who heard popular music samples, and n = `r countries_nhs%>% filter(n>800) %>% pull(name) %>% length` countries for listeners who heard unfamiliar music. The imputation and dimension reduction procedure once again resulted in two dimensions tracking Valence and Arousal, visualised in Figure S8.
+
+The results reported in the main manuscript replicated. For popular music, the ratio of within-country to between-country variability in emotion ratings was `r ((billboard_mod1_800_tidy %>% filter(group=="user_id") %>% pull(prop_var)) / (billboard_mod1_800_tidy %>% filter(group=="country") %>% pull(prop_var))) %>%  r0`:1 valence and `r ((billboard_mod2_800_tidy %>% filter(group=="user_id") %>% pull(prop_var)) / (billboard_mod2_800_tidy %>% filter(group=="country") %>% pull(prop_var))) %>%  r0`:1 for arousal. When analysing emotional responses to unfamiliar music, within-country variability again exceeded between-country variability (`r ((nhs_mod1_800_tidy %>% filter(group=="user_id") %>% pull(prop_var)) / (nhs_mod1_800_tidy %>% filter(group=="country") %>% pull(prop_var))) %>%  r0`:1 for valence and `r ((nhs_mod2_800_tidy %>% filter(group=="user_id") %>% pull(prop_var)) / (nhs_mod2_800_tidy %>% filter(group=="country") %>% pull(prop_var))) %>%  r0`:1 for arousal).
+
+## Comparison to weather data
+
+To put the variance decomposition results into context and rule out the results being an analytical artefact, we applied the same variance analyses to data where we *would* expect to see substantial country-level variation: weather data, which has also been used as a contrast to cross-country music datasets in prior work [@Mehr2019]. We used publicly available data (GSOY; Global Summary of the Year) provided by the NOAA National Centers for Environmental Information. This dataset also has high missingness (although unlike our data, weather station data are often missing non-randomly), and is similar in structure to our musical dataset: Weather stations, which are nested within countries, record multiple weather measures, such as temperature, rainfall and snowfall, across a range of years. This produces a similar structure to our dataset where listeners, nested within countries, provide multiple emotion ratings across a range of songs. 
+
+In contrast to our music dataset, the same analysis on weather data revealed that country-level variation explained `r ((weather_variance_data %>% filter(group=="Country" & factor == "Max. Temp") %>% pull(prop_var)) / (weather_variance_data %>% filter(group=="Station" & factor == "Max. Temp") %>% pull(prop_var))) %>%  r0` times as much variance in maximum yearly temperature as stations nested within countries did, and `r ((weather_variance_data %>% filter(group=="Country" & factor == "Max. Temp") %>% pull(prop_var)) / (weather_variance_data %>% filter(group=="Date" & factor == "Max. Temp") %>% pull(prop_var))) %>%  r0` times as much as the year of recording did. Other measures, such as annual precipitation, demonstrated similar patterns (Figure S5c). The only exception was the number of days with snow; country-level variation explained `r ((weather_variance_data %>% filter(group=="Country" & factor == "Days with snow") %>% pull(prop_var)) / (weather_variance_data %>% filter(group=="Station" & factor == "Days with snow") %>% pull(prop_var))) %>%  r2` times as much variance in days with snow as stations nested within countries did. This reflects the fact that weather stations equipped to measure snow depth are more likely to be located in regions where snowfall is expected, resulting in selective sampling and less between-country variance. 
+
+## Variance decomposition by language 
+
+Country is an imperfect proxy for culture. To ensure that this choice of measure was not driving results, we also replicated the variance decomposition analyses using another proxy for cultural similarity: language [@Dunn2011; @Mace1994]. We ran these analyses both at the level of the native language reported by the listener, and also that language's broader language family according to Glottolog 5.3 [@Hammarstrom2026]. We fit separate mixed models for each of the GEMS-9 dimensions and regressed ratings per dimension onto random intercepts for listener, song and language (or language family). The results were consistent with the country-based analyses: individual differences explained the most variance in responses, followed by the song listeners heard, and finally the listener's native language or language family that the language belonged to. 
+
+For popular music, the median ratio of within-language variance to between-language variance was `r billboard_gems_variance_data_lang_ind$within_to_between %>% median %>% r0`:1 (range: `r billboard_gems_variance_data_lang_ind$within_to_between[which(min(billboard_gems_variance_data_lang_ind$within_to_between)==billboard_gems_variance_data_lang_ind$within_to_between)] %>% unique %>% r0` - `r billboard_gems_variance_data_lang_ind$within_to_between[which(max(billboard_gems_variance_data_lang_ind$within_to_between)==billboard_gems_variance_data_lang_ind$within_to_between)] %>% unique %>% r0`; Table S13). The median ratio of variance within a language family to between families was `r billboard_gems_variance_data_lang$within_to_between %>% median %>% r0`:1 (range: `r billboard_gems_variance_data_lang$within_to_between[which(min(billboard_gems_variance_data_lang$within_to_between)==billboard_gems_variance_data_lang$within_to_between)] %>% unique %>% r0` - `r billboard_gems_variance_data_lang$within_to_between[which(max(billboard_gems_variance_data_lang$within_to_between)==billboard_gems_variance_data_lang$within_to_between)] %>% unique %>% r0`; Table S14). This pattern persisted even when excluding the largest language family represented in our dataset, Indo-European, which was dominated by English-speakers (median ratio: `r billboard_gems_variance_data_lang2$within_to_between %>% median %>% r0`:1, range: `r billboard_gems_variance_data_lang2$within_to_between[which(min(billboard_gems_variance_data_lang2$within_to_between)==billboard_gems_variance_data_lang2$within_to_between)] %>% unique %>% r0` - `r billboard_gems_variance_data_lang2$within_to_between[which(max(billboard_gems_variance_data_lang2$within_to_between)==billboard_gems_variance_data_lang2$within_to_between)] %>% unique %>% r0`).
+
+For unfamiliar music, the ratio of within-group variance to between-group variance were higher. The median ratio of within-language variance to between-language variance was `r nhs_gems_variance_data_lang_ind$within_to_between %>% median %>% r0`:1 (range: `r nhs_gems_variance_data_lang_ind$within_to_between[which(min(nhs_gems_variance_data_lang_ind$within_to_between)==nhs_gems_variance_data_lang_ind$within_to_between)] %>% unique %>% r0` - `r nhs_gems_variance_data_lang_ind$within_to_between[which(max(nhs_gems_variance_data_lang_ind$within_to_between)==nhs_gems_variance_data_lang_ind$within_to_between)] %>% unique %>% r0`; Table S15), while the median ratio of variance within a language family to between families was `r nhs_gems_variance_data_lang$within_to_between %>% median %>% r0`:1 (range: `r nhs_gems_variance_data_lang$within_to_between[which(min(nhs_gems_variance_data_lang$within_to_between)==nhs_gems_variance_data_lang$within_to_between)] %>% unique %>% r0` - `r nhs_gems_variance_data_lang$within_to_between[which(max(nhs_gems_variance_data_lang$within_to_between)==nhs_gems_variance_data_lang$within_to_between)] %>% unique %>% r0`; Table S16).
+
+
+# Supplementary analyses for correlation analysis
+
+
+## Noise ceiling correction 
+
+In the main manuscript, we report correlations between the mean song-wise ratings of pairs of countries. These correlations are likely underestimates of the true correlation due to the sparseness of the data and resulting sampling error. For example, even if two countries' song-wise ratings on *peacefulness* are perfectly correlated in reality, the noise present within each country's data will limit the maximum possible observable correlation using these data. A noise ceiling reflects an estimate of the maximum observable correlation given the noise in the data. As suggested by Cowen and colleagues [-@Cowen2020] and following the same process described in [@Yurdum2023], we corrected for this upper limit by calculating the noise ceiling of each country on each GEMS-9 dimension, which represents an upper limit for correlations using the data from the country.
+
+```{r}
+gems_correlation_results_adjusted_grouped <- gems_correlation_results_adjusted  %>% 
+  group_by(variable) %>% 
+  summarise(mean_corr = mean(corr, na.rm=T))
+
+nhs_gems_correlation_results_adjusted_grouped <- nhs_gems_correlation_results_adjusted  %>% 
+  group_by(variable) %>% 
+  summarise(mean_corr = mean(corr, na.rm=T))
+```
+
+We calculated the noise ceilings using the following formula: 
+
+$$\sqrt{1 - \frac{mean\text{(squared SE per song on a given rating dimension)}}{var(\text{mean score per song on a given rating dimension})}}$$
+
+We then adjusted each pairwise correlation by dividing the observed correlation coefficient by the average of the noise ceilings in that pair of countries (the distribution of adjusted correlation coefficients is visualised in Figure S4). This provides a measure of how the observed correlation compares to the average "expected" maximum correlation, if the data in both countries were perfectly reliable. As it is technically possible for the adjustment to result in a value above r = 1, we capped any values that exceeded this. In the Western Popular Music sample, the average adjusted correlation coefficients ranged from r = `r gems_correlation_results_adjusted_grouped$mean_corr %>% min() %>% r2` (for *transcendence*) to r = `r gems_correlation_results_adjusted_grouped$mean_corr %>% max() %>% r2` (for *peacefulness*), with an average *r* of `r gems_correlation_results_adjusted_grouped$mean_corr %>% mean() %>% r2` across all nine dimensions. In the unfamiliar music sample, the average adjusted correlation coefficients ranged from r = `r nhs_gems_correlation_results_adjusted_grouped$mean_corr %>% min() %>% r2` (for *transcendence*) to r = `r nhs_gems_correlation_results_adjusted_grouped$mean_corr %>% max() %>% r2` (for *joyful activation*), with an average *r* of `r nhs_gems_correlation_results_adjusted_grouped$mean_corr %>% mean() %>% r2`. 
+
+
+
+# Information regarding linked datasets
+
+## The original behavioural contexts for unfamiliar music
+
+The stimuli that comprised the unfamiliar music corpus were the 118 songs featured in the Natural History of Song (NHS) Discography [@Mehr2019]. The NHS Discography features 14-second song segments of archival recordings of songs from 86 mostly smaller-scale societies. These societies span 30 world regions [@Murdock2008; @Naroll1967], over 75 languages, and a range of subsistence methods, resulting in a highly diverse set of world music. 
+
+The songs featured in the Discography were originally used in four behavioural contexts: soothing a baby, dancing, expressing love, and healing illness. Researchers determined the original behavioural contexts of the songs using accompanying liner notes and supporting ethnographic texts, without first listening to the audio. All excerpts and their metadata can be downloaded from https://doi.org/10.5281/zenodo.7265514.
+
+To test whether listener's emotional responses to music reflected the songs' original functions, we calculated the mean arousal and valence rating per song across all participants, and regressed these ratings onto song type. We found that how the songs were originally used in the cultures where they were recorded did indeed predict the emotions listeners reported in this study (Figure S6). The largest effects were on the arousal dimension. Both dance songs and lullabies differed from the mean arousal rating, in opposite directions: Dance songs were higher, and lullabies lower than average in terms of perceived arousal (dance: $\beta$ = `r (arousal_by_type %>% summary)$coefficients["typeDance","Estimate"] %>% r2`, *p* `r (arousal_by_type %>% summary)$coefficients["typeDance","Pr(>|t|)"] %>%  fp`; lullabies: $\beta$ = `r (arousal_by_type %>% summary)$coefficients["typeLullaby","Estimate"] %>% r2`, *p* `r (arousal_by_type %>% summary)$coefficients["typeLullaby","Pr(>|t|)"] %>%  fp`). Lullabies were rated lower on arousal than both dance songs ($\beta$ = `r (arousal_by_type_emmeans %>% as.data.frame) %>% filter(contrast=="Lullaby - Dance") %>% pull(estimate) %>% r2`, *p* `r (arousal_by_type_emmeans %>% as.data.frame) %>% filter(contrast=="Lullaby - Dance") %>% pull(p.value) %>% fp`) and healing songs ($\beta$ = `r (arousal_by_type_emmeans %>% as.data.frame) %>% filter(contrast=="Lullaby - Healing") %>% pull(estimate) %>% r2`, *p* `r (arousal_by_type_emmeans %>% as.data.frame) %>% filter(contrast=="Lullaby - Healing") %>% pull(p.value) %>% fp`), while dance songs were also higher arousal than love songs ($\beta$ = `r (arousal_by_type_emmeans %>% as.data.frame) %>% filter(contrast=="Dance - Love") %>% pull(estimate) %>% r2`, *p* `r (arousal_by_type_emmeans %>% as.data.frame) %>% filter(contrast=="Dance - Love") %>% pull(p.value) %>% fp`). Only dance songs differed from the mean valence score, positively ($\beta$ = `r (valence_by_type %>% summary)$coefficients["typeDance","Estimate"] %>% r2`, *p* `r (valence_by_type %>% summary)$coefficients["typeDance","Pr(>|t|)"] %>%  fp`); dance songs and lullabies were distinguishable from each other based on this dimension ($\beta$ = `r (valence_by_type_emmeans %>% as.data.frame) %>% filter(contrast=="Lullaby - Dance") %>% pull(estimate) %>% r2`, *p* `r (valence_by_type_emmeans %>% as.data.frame) %>% filter(contrast=="Lullaby - Dance") %>% pull(p.value) %>% fp`).
+
+## Perceived behavioural contexts for unfamiliar music
+
+In the manuscript, we analyse the relationship between induced emotions, as reported by participants in the present study, and the perceived behavioural context of the songs in the unfamiliar music sample. The latter ratings come from the publicly available data analysed in Yurdum and colleagues' [-@Yurdum2023] work, accessible at https://github.com/themusiclab/universal-music. This dataset contains ratings from two samples of listeners: 5,516 listeners from 45 industrialised countries (tested online in the non-English native language of their country), and 116 listeners from three smaller-scale societies: the Nyangatom in Ethiopia, the Mentawai in Indonesia, and the Tannese Ni-Vanuatu in Vanuatu. 
+
+In both samples, participants heard a song excerpt from the NHS Discography and then rated what they thought the song was originally used for. Participants from industrialised countries were prompted with the text "Think of the people making this music. I think that they..." and asked to respond on a scale from 1 ("Definitely do not use the music… [context]") to 4 ("Definitely use the music… [context]"), where [context] referred to each of the four behavioural contexts represented in the corpus: "for dancing," "to soothe a baby," "to heal illness," and "to express love for another person." In the smaller-scale societies, the experimenter read instructions out loud in the participant’s native language. The prompt was modified to “Do you think they use the music for [context]?” with the response options “no,” “a little,” and “yes”. Ratings from all participants were centered and scaled within their own cohorts. Higher scores indicate that a song excerpt was judged as being more appropriate for the tested context. For more information regarding the study procedure, translations, and results, see [@Yurdum2023].
+
+We asked whether the emotion ratings gathered in the present manuscript were related to the perceived behavioural contexts of the songs, collected from participants who spoke non-English native languages, in both non-globalised communities and globalised countries [@Yurdum2023]. They were; in almost all cases listeners' emotional responses were strongly related to the perceived functions of the songs as rated by internet-connected participants in their native languages (Figure S7a). High-valence songs were perceived as more appropriate for dancing ($\beta$ =`r ff_mods[["web"]][["danc_v1"]] %>% filter(term=="Valence") %>% pull("estimate") %>% r2`, $SE$ =`r ff_mods[["web"]][["danc_v1"]] %>% filter(term=="Valence") %>% pull("std.error") %>% r2`, *p* `r ff_mods[["web"]][["danc_v1"]] %>% filter(term=="Valence") %>% pull("p.value") %>% fp`) and expressing love for another person ($\beta$ =`r ff_mods[["web"]][["love_v1"]] %>% filter(term=="Valence") %>% pull("estimate") %>% r2`, $SE$ =`r ff_mods[["web"]][["love_v1"]] %>% filter(term=="Valence") %>% pull("std.error") %>% r2`, *p* `r ff_mods[["web"]][["love_v1"]] %>% filter(term=="Valence") %>% pull("p.value") %>% fp`), and less appropriate for healing illness ($\beta$ =`r ff_mods[["web"]][["heal_v1"]] %>% filter(term=="Valence") %>% pull("estimate") %>% r2`, $SE$ =`r ff_mods[["web"]][["heal_v1"]] %>% filter(term=="Valence") %>% pull("std.error") %>% r2`, *p* `r ff_mods[["web"]][["heal_v1"]] %>% filter(term=="Valence") %>% pull("p.value") %>% fp`). Arousal predicted how appropriate listeners thought a song was for dancing ($\beta$ =`r ff_mods[["web"]][["danc_v2"]] %>% filter(term=="Arousal") %>% pull("estimate") %>% r2`, $SE$ =`r ff_mods[["web"]][["danc_v2"]] %>% filter(term=="Arousal") %>% pull("std.error") %>% r2`, *p* `r ff_mods[["web"]][["danc_v2"]] %>% filter(term=="Arousal") %>% pull("p.value") %>% fp`), and how *in*appropriate it would be for soothing infants ($\beta$ =`r ff_mods[["web"]][["baby_v2"]] %>% filter(term=="Arousal") %>% pull("estimate") %>% r2`, $SE$ =`r ff_mods[["web"]][["baby_v2"]] %>% filter(term=="Arousal") %>% pull("std.error") %>% r2`, *p* `r ff_mods[["web"]][["baby_v2"]] %>% filter(term=="Arousal") %>% pull("p.value") %>% fp`) or expressing love for another person ($\beta$ =`r ff_mods[["web"]][["love_v2"]] %>% filter(term=="Arousal") %>% pull("estimate") %>% r2`, $SE$ =`r ff_mods[["web"]][["love_v2"]] %>% filter(term=="Arousal") %>% pull("std.error") %>% r2`, *p* `r ff_mods[["web"]][["love_v2"]] %>% filter(term=="Arousal") %>% pull("p.value") %>% fp`). The emotional ratings were also strongly related to the perceived functions of the songs as rated by the listeners from three relatively isolated cultures (Figure S7b): High-valence songs were rated as more appropriate for dancing ($\beta$ =`r ff_mods[["field"]][["danc_v1"]] %>% filter(term=="Valence") %>% pull("estimate") %>% r2`, $SE$ =`r ff_mods[["field"]][["danc_v1"]] %>% filter(term=="Valence") %>% pull("std.error") %>% r2`, *p* `r ff_mods[["field"]][["danc_v1"]] %>% filter(term=="Valence") %>% pull("p.value") %>% fp`) and expressing love for another person ($\beta$ =`r ff_mods[["field"]][["love_v1"]] %>% filter(term=="Valence") %>% pull("estimate") %>% r2`, $SE$ =`r ff_mods[["field"]][["love_v1"]] %>% filter(term=="Valence") %>% pull("std.error") %>% r2`, *p* `r ff_mods[["field"]][["love_v1"]] %>% filter(term=="Valence") %>% pull("p.value") %>% fp`), while high-arousal songs were rated as appropriate for dancing ($\beta$ =`r ff_mods[["field"]][["danc_v2"]] %>% filter(term=="Arousal") %>% pull("estimate") %>% r2`, $SE$ =`r ff_mods[["field"]][["danc_v2"]] %>% filter(term=="Arousal") %>% pull("std.error") %>% r2`, *p* `r ff_mods[["field"]][["danc_v2"]] %>% filter(term=="Arousal") %>% pull("p.value") %>% fp`) and inappropriate for soothing infants ($\beta$ =`r ff_mods[["field"]][["baby_v2"]] %>% filter(term=="Arousal") %>% pull("estimate") %>% r2`, $SE$ =`r ff_mods[["field"]][["baby_v2"]] %>% filter(term=="Arousal") %>% pull("std.error") %>% r2`, *p* `r ff_mods[["field"]][["baby_v2"]] %>% filter(term=="Arousal") %>% pull("p.value") %>% fp`). 
+
+These results suggest correspondence between the emotional judgements made by globalised participants in this English-language experiment, and perceptual judgements made about the same songs in prior work, despite the fact that the listeners in prior work were not primarily English speakers, and in some cases, not from globalised communities. 
+
+\clearpage
+
+```{r fig-s1, fig.cap="\\textbf{Figure S1. Results of dimension reduction procedure on emotion ratings of popular music.} Panel (a) plots the 25 GEMS emotion ratings in reduced 2D space. Points indicate the original variables that contributed to the imputed low-rank structure, colour-coded in line with Zentner and colleagues' GEMS-9 solution. To interpret the two components produced by dimension reduction, we correlated the loadings of each emotion term on the component with the valence and arousal ratings of the same terms in the NRC VAD lexicon [@Mohammad2025]. The emotion terms that loaded most strongly on Component 1 were high in valence (a), whereas Component 2 was characterised by high-arousal terms (b)."}
+
+knitr::include_graphics(here("viz","figS1.pdf"))
+
+```
+
+\clearpage
+
+```{r fig-s2, fig.height=7, fig.width=6, fig.cap="\\textbf{Figure S2. Results of dimension reduction procedure on emotion ratings of unfamiliar music.} Panel (a) plots the 25 GEMS emotion ratings in reduced 2D space. Points indicate the original variables that contributed to the imputed low-rank structure, colour-coded in line with Zentner and colleagues' GEMS-9 solution. To interpret the two components produced by dimension reduction, we correlated the loadings of each emotion term on the component, with the valence and arousal ratings of the same terms in the NRC VAD lexicon [@Mohammad2025]. The emotion terms that loaded most strongly on Component 1 were high-valence (a), whereas Component 2 was characterised by high-arousal terms (b)."}
+
+knitr::include_graphics(here("viz","figS2.pdf"))
+```
+
+\clearpage
+
+
+```{r fig-s3, fig.cap="\\textbf{Figure S3. Song-wise mean ratings on the reduced components correlated with ratings of pleasantness and excitement from prior work.} Prior work by Mehr and colleagues [-@Mehr2018a] contained ratings of 'happiness', 'pleasantness', and 'excitement' for the 118 unfamiliar music samples we used in the present study. These ratings were intended as proxies for valence and arousal. We used these ratings to validate our interpretation of Component 1 as tracking valence, and Component 2 as tracking arousal. The song-wise mean scores on Component 1 were most strongly correlated with song-wise mean ratings of pleasantness (c), while Component 2 correlated most strongly with ratings of excitement (d). All correlations were significant at *p* < .0001, except between Component 2 and pleasantness (f). The colour of the dot indicates the original behavioural context the song was performed in."}
+
+knitr::include_graphics(here("viz","figS3.pdf"))
+```
+
+\clearpage
+
+```{r out.height="75%",fig.align='center',fig.cap="\\textbf{Figure S4. Emotional responses to music are correlated across countries.} The curves represent the distribution of Pearson's r correlation coefficients observed between countries with at least 400 participants, on each of the nine GEMS dimensions, for popular and unfamiliar music. The lighter curves represent the distribution of correlation coefficients after applying a noise ceiling correction to each one, described in SI Text 4.1, to adjust for the sampling error present in the data."}
+
+knitr::include_graphics(here("viz","adjusted_corr_plot.pdf"))
+
+```
+
+\clearpage
+
+```{r fig-s4, fig.cap="\\textbf{Figure S5. Emotional responses to music vary considerably more among individuals and across songs than they do across countries.} Proportion of explained variance attributable to the country the listener lives in, the song they heard, and the listener’s own unique response pattern for a) popular music, and b) unfamiliar music. Panel (c) contrasts these results with various measures of weather characteristics from the Global Summary of the Year. Almost all weather features vary substantially more from country to country than within a single country. (Avg. Temp = Average annual temperature; Annual Precip. = Total annual precipitation; Days with rain = Number of days with >= 0.01 inch/0.254 millimetre rain in the year; Days with snow = Number of days with snow depth >= 1 inch/25 millimetres.)"}
+
+knitr::include_graphics(here("viz","figS4.pdf"))
+```
+
+
+
+\clearpage
+
+```{r eval=FALSE, fig.height=10, include=FALSE}
+# procedurally generated version of fig 2
+# identical to final version except for aesthetic modifications
+knitr::include_graphics(here("viz","context_cluster_plot.pdf"))
+```
+
+
+```{r out.height="75%",fig.align='center',fig.cap="\\textbf{Figure S6. The original behavioural context of a song predicts the emotions it induces.}  Each dot represents the average Valence and Arousal score of a song from the unfamiliar music corpus, as rated by participants. The colour of the dot indicates the original behavioural context in which each song was performed in the (non-English speaking) society it was recorded in: soothing infants, healing illness, dance, or expressing love for another person. Significance stars within the boxplots denote a difference from the mean rating across all songs (0); significance stars next to brackets denote pairwise comparisons between types of songs. *** < .001, ** < .01, * < .05"}
+
+# The manuscript uses a manually annotated version of context_cluster_plot.pdf
+# This annotated version is identical to the procedurally generated one, but with significance stars
+knitr::include_graphics(here("viz","fig2.pdf"))
+
+```
+
+
+\clearpage
+
+```{r fig-s5,  fig.cap="\\textbf{Figure S7. The emotions induced by songs predicted their perceived behavioural contexts.} The x axes represent the average valence or arousal score of a song from the unfamiliar music corpus, as rated by participants in the present study. The y axes indicate the perceived appropriateness of each song in one of four behavioural contexts: dancing, expressing love for another person, healing illness, or soothing infants. These ratings are taken from Yurdum and colleagues' work [@Yurdum2023] and reflect the perceptions of (a) listeners from 45 industrialised countries, tested in their non-English native languages, and (b) listeners from three smaller-scale societies. The colour of the dot indicates the original behavioural context the song was performed in. All tests marked with *** are significant at p < .001. Non-significant p values are presented in text."}
+
+knitr::include_graphics(here("viz","figS5.pdf"))
+```
+
+\clearpage
+
+```{r fig-s6, fig.width=8, fig.cap="\\textbf{Figure S8. Singular vector loadings for countries with over 800 participants.} Dots indicate the original variables that contributed to the imputed low-rank structure, colour-coded in line with the GEMS-9 factors. Panels (a) and (b) show the loadings produced after filtering the data to countries with over 800 participants, for the popular music sample and the unfamiliar music sample, respectively."}
+knitr::include_graphics(here("viz","figS6.pdf"))
+```
+
+\clearpage
+
+```{r }
+tmp_billboard <- gems_mean_cors_400 %>%
+  mutate(variable = case_when(variable == "joyful_activation" ~ "joyful activation", 
+                              TRUE ~ variable)) %>% 
+  left_join(gems_mean_cors_400_adjusted, by="variable") %>%
+  dplyr::select("GEMS-9 Dimension" = variable,
+                "Mean r" = mean_correlation,
+                "Median r" = median_correlation,
+                "IQR" = iqr,
+                "Adjusted mean r" = mean_adjusted_correlation) %>% 
+  mutate("Mean r" = `Mean r` %>% r2,
+         "Median r (IQR)" = paste0((`Median r` %>% r2)," (", (`IQR` %>% r2),")"),
+         "Adjusted mean r" = `Adjusted mean r` %>% r2
+         ) %>% 
+  dplyr::select("GEMS-9 Dimension","Mean r","Median r (IQR)","Adjusted mean r",-IQR)
+
+tmp_nhs <- nhs_gems_mean_cors_400 %>%
+  mutate(variable = case_when(variable == "joyful_activation" ~ "joyful activation", 
+                              TRUE ~ variable)) %>% 
+  left_join(nhs_gems_mean_cors_400_adjusted, by="variable") %>% 
+  dplyr::select("GEMS-9 Dimension" = variable,
+                "Mean r" = mean_correlation,
+                "Median r" = median_correlation,
+                "IQR" = iqr,
+                "Adjusted mean r" = mean_adjusted_correlation) %>% 
+  mutate("Mean r" = `Mean r` %>% r2,
+         "Median r (IQR)" = paste0((`Median r` %>% r2)," (", (`IQR` %>% r2),")"),
+         "Adjusted mean r" = `Adjusted mean r` %>% r2
+         ) %>% 
+  dplyr::select("GEMS-9 Dimension","Mean r","Median r (IQR)","Adjusted mean r",-IQR)
+
+tmp <- bind_rows("Popular Music" = tmp_billboard, 
+                 "Unfamiliar Music" = tmp_nhs,.id = "Sample")
+
+kable(tmp, booktabs = TRUE, align = "l", escape = FALSE) %>%
+  kable_styling(full_width = FALSE) %>%
+  collapse_rows(columns = c(1)) 
+  # footnote(
+  #   general = "Pearson's r across the song-wise emotion ratings of all pairs of countries with at least 400 listeners. The mean r indicates a lower bound on the average pairwise correlation; the table also presents the median r and inter-quartile range (IQR) of the distribution of r values. The adjusted mean r indicates an estimate of the mean correlation after correcting each correlation in the distribution using a noise ceiling adjustment. ",
+  #   general_title = "Table S1.",
+  #   footnote_as_chunk = TRUE,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = TRUE
+  # )
+```
+
+**Table S1.**
+
+Pearson's r across the song-wise emotion ratings of all pairs of countries with at least 400 listeners. The mean r indicates a lower bound on the average pairwise correlation; the table also presents the median r and inter-quartile range (IQR) of the distribution of r values. The adjusted mean r indicates an estimate of the mean correlation after correcting each correlation in the distribution using a noise ceiling adjustment.
+
+\clearpage
+
+```{r }
+tmp_billboard <- gems_mean_cors_400_languages %>%
+  mutate(variable = case_when(variable == "joyful_activation" ~ "joyful activation", 
+                              TRUE ~ variable)) %>% 
+  dplyr::select("GEMS-9 Dimension" = variable,
+                "Mean r" = mean_correlation,
+                "Median r" = median_correlation,
+                "IQR" = iqr) %>% 
+  mutate("Mean r" = `Mean r` %>% r2,
+         "Median r (IQR)" = paste0((`Median r` %>% r2)," (", (`IQR` %>% r2),")")) %>% 
+  dplyr::select("GEMS-9 Dimension","Mean r","Median r (IQR)",-IQR)
+
+tmp_nhs <- nhs_gems_mean_cors_400_languages %>%
+  mutate(variable = case_when(variable == "joyful_activation" ~ "joyful activation", 
+                              TRUE ~ variable)) %>% 
+  dplyr::select("GEMS-9 Dimension" = variable,
+                "Mean r" = mean_correlation,
+                "Median r" = median_correlation,
+                "IQR" = iqr) %>% 
+  mutate("Mean r" = `Mean r` %>% r2,
+         "Median r (IQR)" = paste0((`Median r` %>% r2)," (", (`IQR` %>% r2),")")) %>% 
+  dplyr::select("GEMS-9 Dimension","Mean r","Median r (IQR)",-IQR)
+
+tmp <- bind_rows("Popular Music" = tmp_billboard, 
+                 "Unfamiliar Music" = tmp_nhs,.id = "Sample")
+
+kable(tmp, booktabs = TRUE, align = "l", escape = FALSE) %>%
+  kable_styling(full_width = FALSE) %>%
+  collapse_rows(columns = c(1)) 
+  # footnote(
+  #   general = "Pearson's r across the song-wise emotion ratings of all pairs of languages with at least 400 listeners. The mean r indicates a lower bound on the average pairwise correlation; the table also presents the median r and inter-quartile range (IQR) of the distribution of r values. ",
+  #   general_title = "Table S2.",
+  #   footnote_as_chunk = TRUE,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = TRUE
+  # )
+```
+
+**Table S2.**
+
+Pearson's r across the song-wise emotion ratings of all pairs of languages with at least 400 listeners. The mean r indicates a lower bound on the average pairwise correlation; the table also presents the median r and inter-quartile range (IQR) of the distribution of r values. 
+
+\clearpage
+
+```{r}
+tmp <- bind_rows(billboard_mod1_tidy, billboard_mod2_tidy)%>%
+  mutate(prop_var = prop_var %>% r2) %>%
+  dplyr::select(Factor = factor, Group = group, `Prop. of Variance` = prop_var) %>% 
+  mutate(Group = case_when(Group == "user_id" ~ "Listener",
+                           Group == "song" ~ "Song",
+                           Group == "country" ~ "Country",
+                           TRUE ~ Group)) %>% 
+  filter(Group != "Residual")
+
+
+kable(tmp, booktabs = TRUE, align = "l", escape = FALSE) %>%
+  kable_styling(full_width = FALSE) %>%
+  collapse_rows(columns = c(1))
+  # footnote(
+  #   general = "Proportion of variance explained by the country the listener lives in, the song they heard, and the listener’s own unique response pattern in response to popular music. These models use imputed and reduced data, which resulted in two components.",
+  #   general_title = "Table S3.",
+  #   footnote_as_chunk = TRUE,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = TRUE
+  # )
+```
+
+**Table S3.**
+
+Proportion of variance explained by the country the listener lives in, the song they heard, and the listener’s own unique response pattern in response to popular music. These models use imputed and reduced data, which resulted in two components. \newline \newline
+
+
+
+
+```{r}
+tmp <- bind_rows(nhs_mod1_tidy, nhs_mod2_tidy)%>%
+  mutate(prop_var = prop_var %>% r2) %>%
+  dplyr::select(Factor = factor, Group = group, `Prop. of Variance` = prop_var) %>% 
+  mutate(Group = case_when(Group == "user_id" ~ "Listener",
+                           Group == "song" ~ "Song",
+                           Group == "country" ~ "Country",
+                           TRUE ~ Group)) %>% 
+  filter(Group != "Residual")
+
+
+
+kable(tmp, booktabs = TRUE, align = "l", escape = FALSE) %>%
+  kable_styling(full_width = FALSE) %>%
+  collapse_rows(columns = c(1)) 
+  # footnote(
+  #   general = "Proportion of variance explained by the country the listener lives in, the song they heard, and the listener’s own unique response pattern in response to unfamiliar music. These models use imputed and reduced data, which resulted in two components.",
+  #   general_title = "Table S4.",
+  #   footnote_as_chunk = TRUE,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = TRUE
+  # )
+```
+
+**Table S4.**
+
+Proportion of variance explained by the country the listener lives in, the song they heard, and the listener’s own unique response pattern in response to unfamiliar music. These models use imputed and reduced data, which resulted in two components.
+
+\clearpage
+
+```{r eval=FALSE, include=FALSE}
+# total n for US-based participants. This number is manually entered in the next table's caption.
+us_count_total # n = 45,053
+```
+
+```{r }
+us_demo <- us_demo %>% 
+  mutate(n = n %>% pn)
+
+kable(us_demo, booktabs = TRUE, align = "l", escape = FALSE) %>%
+  kable_styling(full_width = FALSE) %>%
+  collapse_rows(columns = c(1)) 
+  # footnote(
+  #   general = "Demographic information for US-based participants, across both popular music and unfamiliar music corpora (n = 45,053).",
+  #   general_title = "Table S5.",
+  #   footnote_as_chunk = TRUE,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = TRUE
+  # )
+```
+
+**Table S5.**
+
+Demographic information for US-based participants, across both popular music and unfamiliar music corpora (n = `r us_count_total %>% pn`).
+
+
+\clearpage
+
+
+```{r table-s1}
+
+split_country_table_top_countries <- split_country_table_top_countries %>% 
+  mutate(n = n %>% pn)
+
+kable(
+  split_country_table_top_countries %>%
+    filter(Study == "Popular Western Music") %>%
+    dplyr::select(Country, n),
+  booktabs = TRUE,
+  align = "l",
+  col.names = c("Country", "n"),
+  escape = FALSE
+) %>%
+  kable_styling(full_width = FALSE) %>%
+  collapse_rows(columns = c(1)) # unnecessary but seems to prevent weird chunking by rows of 5
+  # footnote(
+  #   general = "Countries that were reported as the native country of at least 400 participants who rated popular music.",
+  #   general_title = "Table S6.",
+  #   footnote_as_chunk = TRUE,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = TRUE
+  # )
+```
+
+**Table S6.**
+
+Countries that were reported as the native country of at least 400 participants who rated popular music.
+
+\clearpage
+
+```{r table-s2}
+split_language_table_top_languages <- split_language_table_top_languages%>% 
+  mutate(n = n %>% pn)
+
+kable(
+  split_language_table_top_languages %>%
+    filter(Study == "Popular Western Music") %>%
+    dplyr::select(Language, n),
+  booktabs = TRUE,
+  align = "l",
+  col.names = c("Language", "n"),
+  escape = FALSE
+) %>%
+  kable_styling(full_width = FALSE) %>%
+  collapse_rows(columns = c(1)) # unnecessary but seems to prevent weird chunking by rows of 5
+  # footnote(
+  #   general = "Languages that were reported as the native language of at least 400 participants who rated popular music.",
+  #   general_title = "Table S7.",
+  #   footnote_as_chunk = TRUE,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = TRUE
+  # )
+```      
+
+**Table S7.**
+
+Languages that were reported as the native language of at least 400 participants who rated popular music.
+
+\clearpage
+
+```{r table-s3}
+
+
+kable(
+  split_country_table_top_countries %>%
+    filter(Study == "Unfamiliar Global Music") %>%
+    dplyr::select(Country, n),
+  booktabs = TRUE,
+  align = "l",
+  col.names = c("Country", "n"),
+  escape = FALSE
+) %>%
+  kable_styling(full_width = FALSE) %>%
+  collapse_rows(columns = c(1, 2)) 
+  # footnote(
+  #   general = "Countries that were reported as the native country of at least 400 participants who rated unfamiliar music.",
+  #   general_title = "Table S8.",
+  #   footnote_as_chunk = TRUE,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = TRUE
+  # )
+```
+
+**Table S8.**
+
+Languages that were reported as the native language of at least 400 participants who rated unfamiliar music.
+
+\clearpage
+
+```{r table-s4}
+kable(
+  split_language_table_top_languages %>%
+    filter(Study == "Unfamiliar Global Music") %>%
+    dplyr::select(Language, n),
+  booktabs = TRUE,
+  align = "l",
+  col.names = c("Language", "n"),
+  escape = FALSE
+) %>%
+  kable_styling(full_width = FALSE) %>%
+  collapse_rows(columns = c(1, 2)) 
+  # footnote(
+  #   general = "Languages that were reported as the native language of at least 400 participants who rated unfamiliar music.",
+  #   general_title = "Table S9.",
+  #   footnote_as_chunk = TRUE,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = TRUE
+  # )
+```
+
+**Table S9.**
+
+Languages that were reported as the native language of at least 400 participants who rated unfamiliar music.
+
+\clearpage
+
+```{r table-s5}
+kable(
+  bb_meta_data,
+  format = "latex",
+  booktabs = TRUE,
+  linesep = "",
+  align = "l",
+  longtable = TRUE,
+  col.names = c("Year", "Artist", "Song Name"),
+  escape = FALSE
+) %>%
+  kable_styling(
+    full_width = FALSE,
+    font_size = 8,
+    latex_options = "repeat_header"
+  ) %>% 
+  column_spec(
+  3,
+  width = "6cm",
+  latex_valign = "p"
+) 
+  # footnote(
+  #   general  = "The 276 song excerpts featured in the popular music corpus.",
+  #   general_title = "Table S10.",
+  #   footnote_as_chunk = F,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = FALSE
+  # )
+```
+
+**Table S10.**
+
+The 276 song excerpts featured in the popular music corpus.
+
+
+
+\clearpage
+
+```{r table-s6}
+tmp <- billboard_gems_variance_data %>%
+  mutate(prop_var = prop_var %>% r2) %>%
+  mutate(factor = case_when(factor == "joyful_activation" ~ "joyful activation",
+                            TRUE ~ factor)) %>% 
+  dplyr::select(Factor = factor, Group = group, `Prop. of Variance` = prop_var) %>% 
+  mutate(Group = case_when(Group == "Individual" ~ "Listener",
+                           TRUE ~ Group) ,
+         Group = factor(Group, levels=c("Listener","Song","Country"))) %>% 
+  arrange(Factor,Group)
+
+kable(tmp, booktabs = TRUE, align = "l", escape = FALSE) %>%
+  kable_styling(full_width = FALSE) %>%
+  collapse_rows(columns = c(1)) 
+  # footnote(
+  #   general = "Proportion of variance explained by the country the listener lives in, the song they heard, and the listener’s own unique response pattern in response to popular music. These models use raw data aggregated to produce the nine factors reported in Zentner and colleagues' (2008) work, which resulted in nine dimensions.",
+  #   general_title = "Table S11.",
+  #   footnote_as_chunk = TRUE,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = TRUE
+  # )
+```
+
+**Table S11.**
+
+Proportion of variance explained by the country the listener lives in, the song they heard, and the listener’s own unique response pattern in response to popular music. These models use raw data aggregated to produce the nine factors reported in Zentner and colleagues' [@Zentner2008] work, which resulted in nine dimensions.
+
+\clearpage
+
+```{r table-s7}
+tmp <- nhs_gems_variance_data %>%
+  mutate(prop_var = prop_var %>% r2) %>%
+   mutate(factor = case_when(factor == "joyful_activation" ~ "joyful activation",
+                            TRUE ~ factor)) %>% 
+  dplyr::select(Factor = factor, Group = group, `Prop. of Variance` = prop_var)%>% 
+  mutate(Group = case_when(Group == "Individual" ~ "Listener",
+                           TRUE ~ Group),
+         Group = factor(Group, levels=c("Listener","Song","Country"))) %>% 
+  arrange(Factor,Group)
+
+kable(tmp, booktabs = TRUE, align = "l", escape = FALSE) %>%
+  kable_styling(full_width = FALSE) %>%
+  collapse_rows(columns = c(1)) 
+  # footnote(
+  #   general = "Proportion of variance explained by the country the listener lives in, the song they heard, and the listener’s own unique response pattern in response to unfamiliar music. These models use raw data aggregated to produce the nine factors reported in Zentner and colleagues' (2008) work, which resulted in nine dimensions.",
+  #   general_title = "Table S12.",
+  #   footnote_as_chunk = TRUE,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = TRUE
+  # )
+```
+
+**Table S12.**
+
+Proportion of variance explained by the country the listener lives in, the song they heard, and the listener’s own unique response pattern in response to unfamiliar music. These models use raw data aggregated to produce the nine factors reported in Zentner and colleagues' [@Zentner2008] work, which resulted in nine dimensions.
+
+
+\clearpage
+
+```{r }
+tmp <- billboard_gems_variance_data_lang_ind %>%
+  mutate(prop_var = prop_var %>% r2) %>% 
+  mutate(factor = case_when(factor == "joyful_activation" ~ "joyful activation",
+                            TRUE ~ factor)) %>% 
+  dplyr::select(Factor = factor, Group = group, `Prop. of Variance` = prop_var) %>% 
+  mutate(Group = case_when(Group == "Individual" ~ "Listener",
+                           TRUE ~ Group) ,
+         Group = factor(Group, levels=c("Listener","Song","Language"))) %>% 
+  arrange(Factor,Group)
+
+kable(tmp, booktabs = TRUE, align = "l", escape = FALSE) %>%
+  kable_styling(full_width = FALSE) %>%
+  collapse_rows(columns = c(1))
+  # footnote(
+  #   general = "Proportion of variance explained by the listener's native language, the song they heard, and the listener’s own unique response pattern in response to popular music. These models use raw data aggregated to produce the nine factors reported in Zentner and colleagues' work (2008), which resulted in nine dimensions.",
+  #   general_title = "Table S13.",
+  #   footnote_as_chunk = TRUE,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = TRUE
+  # )
+```
+
+**Table S13.**
+
+Proportion of variance explained by the listener's native language, the song they heard, and the listener’s own unique response pattern in response to popular music. These models use raw data aggregated to produce the nine factors reported in Zentner and colleagues' work [@Zentner2008], which resulted in nine dimensions.
+
+
+\clearpage
+
+```{r }
+tmp <- billboard_gems_variance_data_lang %>%
+  mutate(prop_var = prop_var %>% r2) %>%
+   mutate(factor = case_when(factor == "joyful_activation" ~ "joyful activation",
+                            TRUE ~ factor)) %>% 
+  dplyr::select(Factor = factor, Group = group, `Prop. of Variance` = prop_var) %>% 
+  mutate(Group = case_when(Group == "Individual" ~ "Listener",
+                           TRUE ~ Group) ,
+         Group = factor(Group, levels=c("Listener","Song","Language Family"))) %>% 
+  arrange(Factor,Group)
+
+kable(tmp, booktabs = TRUE, align = "l", escape = FALSE) %>%
+  kable_styling(full_width = FALSE) %>%
+  collapse_rows(columns = c(1)) 
+  # footnote(
+  #   general = "Proportion of variance explained by the language family that the listener's native language belonged to, the song they heard, and the listener’s own unique response pattern in response to popular music. These models use raw data aggregated to produce the nine factors reported in Zentner and colleagues' (2008) work, which resulted in nine dimensions.",
+  #   general_title = "Table S14.",
+  #   footnote_as_chunk = TRUE,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = TRUE
+  # )
+```
+
+**Table S14.**
+
+Proportion of variance explained by the language family that the listener's native language belonged to, the song they heard, and the listener’s own unique response pattern in response to popular music. These models use raw data aggregated to produce the nine factors reported in Zentner and colleagues' [@Zentner2008] work, which resulted in nine dimensions.
+
+\clearpage
+
+```{r }
+tmp <- nhs_gems_variance_data_lang_ind %>%
+  mutate(prop_var = prop_var %>% r2) %>%
+   mutate(factor = case_when(factor == "joyful_activation" ~ "joyful activation",
+                            TRUE ~ factor)) %>% 
+  dplyr::select(Factor = factor, Group = group, `Prop. of Variance` = prop_var) %>% 
+  mutate(Group = case_when(Group == "Individual" ~ "Listener",
+                           TRUE ~ Group) ,
+         Group = factor(Group, levels=c("Listener","Song","Language"))) %>% 
+  arrange(Factor,Group)
+
+kable(tmp, booktabs = TRUE, align = "l", escape = FALSE) %>%
+  kable_styling(full_width = FALSE) %>%
+  collapse_rows(columns = c(1)) 
+  # footnote(
+  #   general = "Proportion of variance explained by the listener's native language, the song they heard, and the listener’s own unique response pattern in response to unfamiliar music. These models use raw data aggregated to produce the nine factors reported in Zentner and colleagues' work (2008), which resulted in nine dimensions.",
+  #   general_title = "Table S15.",
+  #   footnote_as_chunk = TRUE,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = TRUE
+  # )
+```
+
+**Table S15.**
+
+Proportion of variance explained by the listener's native language, the song they heard, and the listener’s own unique response pattern in response to unfamiliar music. These models use raw data aggregated to produce the nine factors reported in Zentner and colleagues' work [-@Zentner2008], which resulted in nine dimensions.
+
+\clearpage
+
+```{r }
+tmp <- nhs_gems_variance_data_lang %>%
+  mutate(prop_var = prop_var %>% r2) %>%
+   mutate(factor = case_when(factor == "joyful_activation" ~ "joyful activation",
+                            TRUE ~ factor)) %>% 
+  dplyr::select(Factor = factor, Group = group, `Prop. of Variance` = prop_var) %>% 
+  mutate(Group = case_when(Group == "Individual" ~ "Listener",
+                           TRUE ~ Group) ,
+         Group = factor(Group, levels=c("Listener","Song","Language Family"))) %>% 
+  arrange(Factor,Group)
+
+kable(tmp, booktabs = TRUE, align = "l", escape = FALSE) %>%
+  kable_styling(full_width = FALSE) %>%
+  collapse_rows(columns = c(1)) 
+  # footnote(
+  #   general = "Proportion of variance explained by the language family that the listener's native language belonged to, the song they heard, and the listener’s own unique response pattern in response to unfamiliar music. These models use raw data aggregated to produce the nine factors reported in Zentner and colleagues' (2008) work, which resulted in nine dimensions. \\parencite{Zentner2008}",
+  #   general_title = "Table S16.",
+  #   footnote_as_chunk = TRUE,
+  #   title_format = "bold",
+  #   escape = FALSE,
+  #   threeparttable = TRUE
+  # )
+```
+
+**Table S16.**
+
+Proportion of variance explained by the language family that the listener's native language belonged to, the song they heard, and the listener’s own unique response pattern in response to unfamiliar music. These models use raw data aggregated to produce the nine factors reported in Zentner and colleagues' [-@Zentner2008] work, which resulted in nine dimensions.
+
+\clearpage
+
+# References {-}
